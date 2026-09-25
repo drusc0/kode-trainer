@@ -105,4 +105,7 @@ async def reply(client: AsyncAnthropic, model: str, system: str, history: list[C
         raise ChatError("Couldn't reach the assistant. Check your internet connection.") from e
     if resp.stop_reason == "refusal":
         raise ChatError("The assistant declined to answer that. Try rephrasing.")
-    return "".join(b.text for b in resp.content if b.type == "text")
+    text = "".join(b.text for b in resp.content if b.type == "text")
+    if not text.strip():
+        raise ChatError("The assistant returned an empty reply. Try again.")
+    return text

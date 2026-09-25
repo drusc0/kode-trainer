@@ -96,3 +96,9 @@ def test_blank_message_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
     resp = TestClient(app).post(CHAT_URL, json={"message": "   ", "code": ""})
     assert resp.status_code == 422
+
+
+def test_reply_without_text_raises_chat_error() -> None:
+    client, _ = fake_client("  \n")
+    with pytest.raises(chat.ChatError):
+        asyncio.run(chat.reply(client, "m", "S", [], "x"))
