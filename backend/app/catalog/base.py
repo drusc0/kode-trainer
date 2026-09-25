@@ -1,0 +1,115 @@
+from __future__ import annotations
+
+import random
+from collections import deque
+from dataclasses import dataclass, field
+from typing import Callable, Optional
+
+
+@dataclass
+class Problem:
+    slug: str
+    title: str
+    difficulty: str                      # Easy | Medium | Hard
+    pattern: str                         # slug of a pattern guide page
+    topics: list[str]
+    companies: list[str]                 # google | meta
+    statement: str                       # markdown
+    entry: str                           # method name (function) or class name (design)
+    params: list[tuple[str, str]]        # (name, python type); "TreeNode@0" = node of arg 0 by value
+    returns: str
+    examples: list[dict]                 # {"args": [...], "note": "..."}
+    constraints: list[str]
+    hints: list[str]
+    reference: str                       # trusted Python solution, run in the sandbox to compute expected outputs
+    gen: Callable[[random.Random], list]
+    compare: str = "exact"
+    kind: str = "function"               # function | design
+    time_limit_ms: int = 2000
+    starter: Optional[str] = None        # required for design problems
+    seed_version: int = 1                # bump to regenerate this problem's hidden tests
+
+    def display_type(self, t: str) -> str:
+        return "TreeNode" if t.startswith("TreeNode@") else t
+
+    def starter_code(self) -> str:
+        if self.starter:
+            return self.starter.strip("\n") + "\n"
+        sig = ", ".join(f"{n}: {self.display_type(t)}" for n, t in self.params)
+        pre = ""
+        types = " ".join(t for _, t in self.params) + " " + self.returns
+        if "ListNode" in types:
+            pre += ("# Definition for singly-linked list.\n# class ListNode:\n#     def __init__(self, val=0, next=None):\n"
+                    "#         self.val = val\n#         self.next = next\n")
+        if "TreeNode" in types:
+            pre += ("# Definition for a binary tree node.\n# class TreeNode:\n#     def __init__(self, val=0, left=None, right=None):\n"
+                    "#         self.val = val\n#         self.left = left\n#         self.right = right\n")
+        return f"{pre}class Solution:\n    def {self.entry}(self, {sig}) -> {self.returns}:\n        \n"
+
+    def param_types(self) -> list[str]:
+        return [t for _, t in self.params]
+
+
+# ---------------------------------------------------------------- generator helpers
+def ints(r: random.Random, n: int, lo: int, hi: int) -> list[int]:
+    return [r.randint(lo, hi) for _ in range(n)]
+
+
+def distinct(r: random.Random, n: int, lo: int, hi: int) -> list[int]:
+    return r.sample(range(lo, hi + 1), n)
+
+
+def word(r: random.Random, n: int, alpha: str) -> str:
+    return "".join(r.choice(alpha) for _ in range(n))
+
+
+def random_tree(r: random.Random, values: list) -> list:
+    """Random binary tree shape filled with `values` in insertion order, as a LeetCode level-order list."""
+    if not values:
+        return []
+    nodes = [{"v": values[0], "l": None, "r": None}]
+    for v in values[1:]:
+        while True:
+            parent = r.choice(nodes)
+            side = r.choice("lr")
+            if parent[side] is None:
+                child = {"v": v, "l": None, "r": None}
+                parent[side] = child
+                nodes.append(child)
+                break
+    return level_order(nodes[0])
+
+
+def random_bst(r: random.Random, n: int, lo: int, hi: int) -> list:
+    """Random shape, values assigned in-order so it is a valid BST."""
+    vals = sorted(r.sample(range(lo, hi + 1), n))
+    shape = {"n": 0}
+
+    def build(k):
+        if k == 0:
+            return None
+        left = r.randint(0, k - 1)
+        node = {"l": build(left)}
+        node["v"] = vals[shape["n"]]
+        shape["n"] += 1
+        node["r"] = build(k - 1 - left)
+        return node
+
+    return level_order(build(n)) if n else []
+
+
+def level_order(root) -> list:
+    if root is None:
+        return []
+    out, q = [], deque([root])
+    while q:
+        node = q.popleft()
+        if node is None:
+            out.append(None)
+            continue
+        out.append(node["v"])
+        q.append(node["l"])
+        q.append(node["r"])
+    while out and out[-1] is None:
+        out.pop()
+    return out

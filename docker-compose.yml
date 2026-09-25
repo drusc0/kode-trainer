@@ -1,0 +1,57 @@
+# KodeTrain: web (React via nginx) -> api (FastAPI) -> mongo, and api -> runner (sandbox).
+# The runner sits alone on an internal network: no internet, no route to Mongo.
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes: [mongo-data:/data/db]
+    networks: [backend]
+
+  runner:
+    build: ./runner
+    restart: unless-stopped
+    init: true                      # reaps any orphaned sandbox processes
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID, KILL] # only what's needed to drop each job to its own uid and clean up
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    mem_limit: 3g
+    cpus: 2
+    environment:
+      RUNNER_TOKEN: ${RUNNER_TOKEN:?set RUNNER_TOKEN in .env}
+      RUNNER_SLOTS: "4"
+      RUNNER_MEMORY_MB: "512"
+    networks: [sandbox]
+    # Strongly recommended on Linux hosts: run the sandbox under gVisor for a user-space kernel.
+    # Install runsc (https://gvisor.dev/docs/user_guide/install/) and uncomment:
+    # runtime: runsc
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    depends_on: [mongo, runner]
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: kodetrain
+      RUNNER_URL: http://runner:8080
+      RUNNER_TOKEN: ${RUNNER_TOKEN:?set RUNNER_TOKEN in .env}
+      CORS_ORIGINS: http://localhost:5173,http://localhost:8080
+    ports: ["127.0.0.1:8000:8000"]  # for `npm run dev`; nginx proxies /api in the full stack
+    networks: [backend, sandbox]
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on: [api]
+    ports: ["127.0.0.1:8080:80"]
+    networks: [backend]
+
+networks:
+  backend: {}
+  sandbox:
+    internal: true
+
+volumes:
+  mongo-data: {}
