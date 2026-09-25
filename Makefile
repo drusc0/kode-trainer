@@ -1,4 +1,6 @@
-.PHONY: up down logs dev-api dev-web test-sandbox
+.PHONY: up down logs dev-web lint format test test-sandbox
+
+PNPM := corepack pnpm
 
 up:            ## build and start everything at http://localhost:8080
 	@test -f .env || (cp .env.example .env && sed -i.bak "s/change-me/$$(openssl rand -hex 32)/" .env && rm -f .env.bak)
@@ -11,7 +13,19 @@ logs:
 	docker compose logs -f api runner
 
 dev-web:       ## hot-reload frontend on :5173 against the dockerized API
-	cd frontend && npm install && npm run dev
+	cd frontend && $(PNPM) install && $(PNPM) dev
+
+lint:          ## ruff + mypy for the API, Biome for the web app
+	cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy
+	cd frontend && $(PNPM) install --frozen-lockfile && $(PNPM) lint && $(PNPM) exec tsc --noEmit
+
+format:        ## auto-fix formatting and safe lint fixes on both sides
+	cd backend && uv run ruff format . && uv run ruff check --fix .
+	cd frontend && $(PNPM) format
+
+test:          ## unit tests (no Docker needed); see test-sandbox for the full runner check
+	cd backend && uv run pytest
+	cd frontend && $(PNPM) test
 
 test-sandbox:  ## run every reference solution + attack cases through the real runner container
 	docker compose run --rm --entrypoint python3 -v $$(pwd)/backend:/backend:ro -v $$(pwd)/scripts:/scripts:ro runner /scripts/validate_catalog.py

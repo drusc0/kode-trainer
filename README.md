@@ -29,6 +29,8 @@ Other commands:
 | Command | What it does |
 |---|---|
 | `make logs` | Follow API and runner logs |
+| `make lint` / `make format` | ruff + mypy for the API, Biome + `tsc` for the web app ([backend/TOOLING.md](backend/TOOLING.md), [frontend/TOOLING.md](frontend/TOOLING.md)) |
+| `make test` | pytest and Vitest unit tests, no Docker needed |
 | `make test-sandbox` | Validate all 53 problems **and** a set of hostile submissions inside the real runner container |
 | `make dev-web` | Vite dev server on :5173 with hot reload, proxying `/api` to the dockerized API on :8000 |
 | `make down` | Stop everything (Mongo data persists in the `mongo-data` volume) |
@@ -109,9 +111,11 @@ Then run `make test-sandbox` and restart the API. The fingerprint change trigger
 # runner (Linux only, needs root to switch uids; or RUNNER_DROP_PRIVILEGES=0 RUNNER_REQUIRE_SECCOMP=0 for a quick, unsafe run)
 cd runner && RUNNER_TOKEN=dev python3 server.py
 # api
-cd backend && pip install -r requirements.txt && RUNNER_TOKEN=dev RUNNER_URL=http://localhost:8080 uvicorn app.main:app --reload
+cd backend && RUNNER_TOKEN=dev RUNNER_URL=http://localhost:8080 uv run uvicorn app.main:app --reload
 # web
-cd frontend && npm install && npm run dev
+cd frontend && corepack pnpm install && corepack pnpm dev
 ```
+
+Local tooling needs [uv](https://docs.astral.sh/uv/) and Node 24 (which ships `corepack`, so pnpm needs no separate install).
 
 Note that the unsafe runner flags remove the sandbox's main protections. Use them only with your own code.
