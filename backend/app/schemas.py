@@ -165,3 +165,9 @@ class SessionStats(BaseModel):
     submissions: int
     accepted: int
     recent: list[RecentSubmission]
+
+
+# ---------------------------------------------------------------- chat
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str

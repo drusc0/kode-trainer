@@ -14,6 +14,8 @@ class Settings:
     cors_origins: list[str] = [o for o in os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",") if o]
     max_code_bytes: int = 64 * 1024
     max_custom_cases: int = 10
+    anthropic_api_key: str = os.environ.get("ANTHROPIC_API_KEY", "")
+    chat_model: str = os.environ.get("CHAT_MODEL", "claude-sonnet-5")
 
 
 settings = Settings()
