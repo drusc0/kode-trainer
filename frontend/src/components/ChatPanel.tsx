@@ -18,7 +18,9 @@ export default function ChatPanel({ sessionId, slug, code }: { sessionId: string
     return () => { cancelled = true; };
   }, [sessionId, slug]);
 
-  useEffect(() => endRef.current?.scrollIntoView({ block: "end" }), [messages, busy]);
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "end" });
+  }, [messages, busy]);
 
   const send = async () => {
     const text = draft.trim();
