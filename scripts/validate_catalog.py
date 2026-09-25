@@ -4,6 +4,7 @@
 2. Every reference passes its own checker (catches checker / generator bugs).
 3. A set of hostile submissions is contained (timeouts, memory, fork bombs, files, network, exec).
 """
+
 import os
 import random
 import sys
@@ -13,13 +14,22 @@ for p in ("/app", os.path.join(os.path.dirname(__file__), "..", "runner")):
 for p in ("/backend", os.path.join(os.path.dirname(__file__), "..", "backend")):
     sys.path.insert(0, p)
 
-from sandbox import run_job  # noqa: E402
 from app.catalog import PROBLEMS  # noqa: E402
+from sandbox import run_job  # noqa: E402
 
 
 def job(p, code, tests, expected=None, tl=None):
-    return {"code": code, "kind": p.kind, "entry": p.entry, "param_types": p.param_types(), "return_type": p.returns,
-            "tests": tests, "expected": expected, "compare": p.compare, "time_limit_ms": tl or 10_000}
+    return {
+        "code": code,
+        "kind": p.kind,
+        "entry": p.entry,
+        "param_types": p.param_types(),
+        "return_type": p.returns,
+        "tests": tests,
+        "expected": expected,
+        "compare": p.compare,
+        "time_limit_ms": tl or 10_000,
+    }
 
 
 failures = 0
@@ -29,7 +39,9 @@ for p in PROBLEMS:
     bad = [x for x in r1["results"] if "error" in x or x.get("truncated")]
     if r1["status"] != "ok" or len(r1["results"]) != len(tests) or bad:
         failures += 1
-        print(f"FAIL {p.slug}: reference {r1['status']} {r1['error'] or (bad[0].get('error') if bad else 'missing results')}")
+        print(
+            f"FAIL {p.slug}: reference {r1['status']} {r1['error'] or (bad[0].get('error') if bad else 'missing results')}"
+        )
         continue
     r2 = run_job(job(p, p.reference, tests, [x["output"] for x in r1["results"]]), 1)
     ok = sum(1 for x in r2["results"] if x.get("ok"))
@@ -55,7 +67,9 @@ for name, code in ATTACKS.items():
     contained = r["status"] != "ok" or bool(res.get("error"))
     leaked = "RUNNER_TOKEN" in str(res.get("output")) if name == "read_env" else not contained
     failures += bool(leaked)
-    print(f"  {'LEAK' if leaked else 'ok  '} {name:10s} -> {r['status']}: {(r['error'] or res.get('error') or str(res.get('output')))[:100]!r}")
+    print(
+        f"  {'LEAK' if leaked else 'ok  '} {name:10s} -> {r['status']}: {(r['error'] or res.get('error') or str(res.get('output')))[:100]!r}"
+    )
 
 print("\nALL GOOD" if not failures else f"\n{failures} FAILURE(S)")
 sys.exit(1 if failures else 0)

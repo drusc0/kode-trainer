@@ -52,7 +52,7 @@ def build_system_prompt(p: Problem, examples: list[Example]) -> str:
     names = [n for n, _ in p.params]
     lines = []
     for i, ex in enumerate(examples, 1):
-        inputs = ", ".join(f"{n} = {v}" for n, v in zip(names, ex.args))
+        inputs = ", ".join(f"{n} = {v}" for n, v in zip(names, ex.args, strict=True))
         line = f"Example {i}: {inputs} → {ex.output or '(not computed yet)'}"
         lines.append(f"{line}  ({ex.note})" if ex.note else line)
     constraints = "\n".join(f"- {c}" for c in p.constraints)

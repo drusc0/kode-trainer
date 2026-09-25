@@ -11,6 +11,7 @@ The harness never trusts user output: user prints are captured per test and trun
 A determined user can still tamper with their *own* results (same process), which only
 affects their own practice score; they cannot reach the network, other jobs, or the host.
 """
+
 import io
 import json
 import math
@@ -20,21 +21,62 @@ import sys
 import time
 import traceback
 from collections import deque
+from types import FrameType
+from typing import Any, NoReturn, TextIO, cast
 
-MAX_STDOUT = 16_000          # chars of print() output kept per test
+MAX_STDOUT = 16_000  # chars of print() output kept per test
 MAX_OUTPUT_REPR = 2_000_000  # chars of serialized return value kept
 
 
 # ---------------------------------------------------------------- lockdown
 DENY_SYSCALLS = [
-    "socket", "socketpair", "connect", "bind", "listen", "accept", "accept4",
-    "sendto", "sendmsg", "sendmmsg", "recvfrom", "recvmsg", "recvmmsg",
-    "execve", "execveat", "ptrace", "process_vm_readv", "process_vm_writev",
-    "mount", "umount2", "pivot_root", "chroot", "unshare", "setns",
-    "keyctl", "add_key", "request_key", "bpf", "perf_event_open", "userfaultfd",
-    "io_uring_setup", "io_uring_enter", "io_uring_register", "personality",
-    "open_by_handle_at", "name_to_handle_at", "kexec_load", "reboot", "swapon", "swapoff",
-    "init_module", "finit_module", "delete_module", "acct", "quotactl", "setrlimit", "prlimit64",
+    "socket",
+    "socketpair",
+    "connect",
+    "bind",
+    "listen",
+    "accept",
+    "accept4",
+    "sendto",
+    "sendmsg",
+    "sendmmsg",
+    "recvfrom",
+    "recvmsg",
+    "recvmmsg",
+    "execve",
+    "execveat",
+    "ptrace",
+    "process_vm_readv",
+    "process_vm_writev",
+    "mount",
+    "umount2",
+    "pivot_root",
+    "chroot",
+    "unshare",
+    "setns",
+    "keyctl",
+    "add_key",
+    "request_key",
+    "bpf",
+    "perf_event_open",
+    "userfaultfd",
+    "io_uring_setup",
+    "io_uring_enter",
+    "io_uring_register",
+    "personality",
+    "open_by_handle_at",
+    "name_to_handle_at",
+    "kexec_load",
+    "reboot",
+    "swapon",
+    "swapoff",
+    "init_module",
+    "finit_module",
+    "delete_module",
+    "acct",
+    "quotactl",
+    "setrlimit",
+    "prlimit64",
 ]
 
 
@@ -50,7 +92,7 @@ def lockdown(required: bool) -> None:
         lib = ctypes.CDLL(path, use_errno=True)
     except OSError:
         if required:
-            raise SystemExit("libseccomp not available but required")
+            raise SystemExit("libseccomp not available but required") from None
         return
     lib.seccomp_init.restype = ctypes.c_void_p
     lib.seccomp_init.argtypes = [ctypes.c_uint32]
@@ -78,25 +120,25 @@ def lockdown(required: bool) -> None:
 
 # ---------------------------------------------------------------- data structures
 class ListNode:
-    def __init__(self, val=0, next=None):
+    def __init__(self, val: Any = 0, next: "ListNode | None" = None) -> None:
         self.val = val
         self.next = next
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"ListNode({self.val})"
 
 
 class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
+    def __init__(self, val: Any = 0, left: "TreeNode | None" = None, right: "TreeNode | None" = None) -> None:
         self.val = val
         self.left = left
         self.right = right
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"TreeNode({self.val})"
 
 
-def build_list(vals):
+def build_list(vals: list[Any] | None) -> ListNode | None:
     head = cur = ListNode()
     for v in vals or []:
         cur.next = ListNode(v)
@@ -104,8 +146,8 @@ def build_list(vals):
     return head.next
 
 
-def list_to_array(node, limit=200_000):
-    out = []
+def list_to_array(node: ListNode | None, limit: int = 200_000) -> list[Any]:
+    out: list[Any] = []
     while node is not None:
         if len(out) >= limit:
             raise ValueError("returned linked list is too long (cycle?)")
@@ -114,7 +156,7 @@ def list_to_array(node, limit=200_000):
     return out
 
 
-def build_tree(vals):
+def build_tree(vals: list[Any] | None) -> TreeNode | None:
     if not vals or vals[0] is None:
         return None
     root = TreeNode(vals[0])
@@ -122,18 +164,22 @@ def build_tree(vals):
     while q and i < len(vals):
         node = q.popleft()
         if i < len(vals) and vals[i] is not None:
-            node.left = TreeNode(vals[i]); q.append(node.left)
+            node.left = TreeNode(vals[i])
+            q.append(node.left)
         i += 1
         if i < len(vals) and vals[i] is not None:
-            node.right = TreeNode(vals[i]); q.append(node.right)
+            node.right = TreeNode(vals[i])
+            q.append(node.right)
         i += 1
     return root
 
 
-def tree_to_array(root, limit=200_000):
+def tree_to_array(root: TreeNode | None, limit: int = 200_000) -> list[Any]:
     if root is None:
         return []
-    out, q, seen = [], deque([root]), 0
+    out: list[Any] = []
+    q: deque[TreeNode | None] = deque([root])
+    seen = 0
     while q:
         node = q.popleft()
         seen += 1
@@ -150,7 +196,7 @@ def tree_to_array(root, limit=200_000):
     return out
 
 
-def find_node(root, val):
+def find_node(root: TreeNode | None, val: Any) -> TreeNode | None:
     stack = [root]
     while stack:
         n = stack.pop()
@@ -170,10 +216,10 @@ def base_type(t: str) -> str:
     return t
 
 
-def convert_args(raw_args, param_types):
+def convert_args(raw_args: list[Any], param_types: list[str]) -> list[Any]:
     """JSON args -> Python objects the solution expects."""
-    out = []
-    for raw, t in zip(raw_args, param_types):
+    out: list[Any] = []
+    for raw, t in zip(raw_args, param_types, strict=False):
         bt = base_type(t)
         if bt == "ListNode":
             out.append(build_list(raw))
@@ -189,7 +235,7 @@ def convert_args(raw_args, param_types):
     return out
 
 
-def normalize(value, return_type):
+def normalize(value: Any, return_type: str | None) -> Any:
     """Python return value -> JSON-able value."""
     bt = base_type(return_type or "")
     if bt == "ListNode":
@@ -199,7 +245,7 @@ def normalize(value, return_type):
     return to_jsonable(value)
 
 
-def to_jsonable(v, depth=0):
+def to_jsonable(v: Any, depth: int = 0) -> Any:
     if depth > 200:
         return repr(v)
     if v is None or isinstance(v, (bool, int, str)):
@@ -226,23 +272,27 @@ def to_jsonable(v, depth=0):
 
 
 # ---------------------------------------------------------------- comparison
-def strict_equal(a, b):
+def strict_equal(a: Any, b: Any) -> bool:
     if isinstance(a, bool) or isinstance(b, bool):
         return type(a) is type(b) and a == b
     if isinstance(a, (int, float)) and isinstance(b, (int, float)):
         return a == b
     if isinstance(a, list) and isinstance(b, list):
-        return len(a) == len(b) and all(strict_equal(x, y) for x, y in zip(a, b))
+        return len(a) == len(b) and all(strict_equal(x, y) for x, y in zip(a, b, strict=True))
     if isinstance(a, dict) and isinstance(b, dict):
         return a.keys() == b.keys() and all(strict_equal(a[k], b[k]) for k in a)
     return type(a) is type(b) and a == b
 
 
-def _sort_key(x):
+def _sort_key(x: Any) -> str:
     return json.dumps(x, sort_keys=True)
 
 
-def is_valid_parens(s):
+def _nested_sorted(groups: list[list[Any]]) -> list[list[Any]]:
+    return sorted((sorted(x, key=_sort_key) for x in groups), key=_sort_key)
+
+
+def is_valid_parens(s: str) -> bool:
     bal = 0
     for c in s:
         if c == "(":
@@ -254,12 +304,12 @@ def is_valid_parens(s):
     return bal == 0
 
 
-def is_subsequence(small, big):
+def is_subsequence(small: str, big: str) -> bool:
     it = iter(big)
     return all(c in it for c in small)
 
 
-def check(mode, out, exp, args):
+def check(mode: str, out: Any, exp: Any, args: Any) -> bool:
     try:
         if exp is None and mode != "exact":
             return out is None  # custom input with no valid answer
@@ -270,21 +320,25 @@ def check(mode, out, exp, args):
         if mode == "nested_sorted":
             if not isinstance(out, list) or not all(isinstance(x, list) for x in out):
                 return False
-            norm = lambda g: sorted((sorted(x, key=_sort_key) for x in g), key=_sort_key)
-            return strict_equal(norm(out), norm(exp))
+            return strict_equal(_nested_sorted(out), _nested_sorted(exp))
         if mode == "float":
             return isinstance(out, (int, float)) and not isinstance(out, bool) and abs(out - exp) < 1e-5
         if mode == "two_sum":
             nums, target = args
-            return (isinstance(out, list) and len(out) == 2 and all(isinstance(i, int) and not isinstance(i, bool) and 0 <= i < len(nums) for i in out)
-                    and out[0] != out[1] and nums[out[0]] + nums[out[1]] == target)
+            return (
+                isinstance(out, list)
+                and len(out) == 2
+                and all(isinstance(i, int) and not isinstance(i, bool) and 0 <= i < len(nums) for i in out)
+                and out[0] != out[1]
+                and nums[out[0]] + nums[out[1]] == target
+            )
         if mode == "peak":
             nums = args[0]
             if not isinstance(out, int) or isinstance(out, bool) or not 0 <= out < len(nums):
                 return False
             left = nums[out - 1] if out > 0 else -math.inf
             right = nums[out + 1] if out + 1 < len(nums) else -math.inf
-            return nums[out] > left and nums[out] > right
+            return bool(nums[out] > left and nums[out] > right)
         if mode == "min_window":
             s, t = args
             if not isinstance(out, str) or len(out) != len(exp):
@@ -293,7 +347,7 @@ def check(mode, out, exp, args):
                 return out == ""
             if out not in s:
                 return False
-            need = {}
+            need: dict[str, int] = {}
             for c in t:
                 need[c] = need.get(c, 0) + 1
             for c in out:
@@ -316,15 +370,18 @@ class TimeLimitExceeded(BaseException):
     pass
 
 
-def _on_alarm(signum, frame):
+def _on_alarm(signum: int, frame: FrameType | None) -> NoReturn:
     raise TimeLimitExceeded()
 
 
 class CappedIO(io.TextIOBase):
-    def __init__(self, cap):
-        self.cap, self.parts, self.size, self.truncated = cap, [], 0, False
+    def __init__(self, cap: int) -> None:
+        self.cap = cap
+        self.parts: list[str] = []
+        self.size = 0
+        self.truncated = False
 
-    def write(self, s):
+    def write(self, s: Any) -> int:
         s = str(s)
         room = self.cap - self.size
         if room > 0:
@@ -334,15 +391,15 @@ class CappedIO(io.TextIOBase):
             self.truncated = True
         return len(s)
 
-    def getvalue(self):
+    def getvalue(self) -> str:
         return "".join(self.parts) + ("\n… output truncated" if self.truncated else "")
 
 
-def user_traceback(exc):
+def user_traceback(exc: BaseException) -> str:
     frames = [f for f in traceback.extract_tb(exc.__traceback__) if f.filename == "<solution>"]
     lines = [f"Line {f.lineno} in {f.name}" + (f": {f.line}" if f.line else "") for f in frames[-3:]]
     head = f"{type(exc).__name__}: {exc}"
-    return "\n".join([head] + lines)
+    return "\n".join([head, *lines])
 
 
 PRELUDE = """
@@ -357,7 +414,8 @@ from math import inf
 """
 
 
-def main():
+def main() -> None:
+    real_stdout, real_stderr = sys.stdout, sys.stderr
     job = json.loads(sys.stdin.buffer.read().decode("utf-8"))
     out_fd = os.dup(1)
     devnull = os.open(os.devnull, os.O_RDWR)
@@ -366,7 +424,7 @@ def main():
     os.dup2(devnull, 2)
     chan = os.fdopen(out_fd, "w", buffering=1, encoding="utf-8")
 
-    def emit(obj):
+    def emit(obj: dict[str, Any]) -> None:
         chan.write(json.dumps(obj, default=repr) + "\n")
         chan.flush()
 
@@ -384,48 +442,68 @@ def main():
     mode = job.get("compare", "exact")
     tl = max(0.05, job.get("time_limit_ms", 2000) / 1000)
 
-    ns = {"__name__": "__main__", "ListNode": ListNode, "TreeNode": TreeNode}
+    ns: dict[str, Any] = {"__name__": "__main__", "ListNode": ListNode, "TreeNode": TreeNode}
     exec(compile(PRELUDE, "<prelude>", "exec"), ns)
 
     # compile + load
     try:
         compiled = compile(code, "<solution>", "exec")
     except SyntaxError as e:
-        emit({"type": "compile_error", "error": f"Line {e.lineno}: {e.msg}" + (f"\n    {e.text.rstrip()}" if e.text else "")})
+        emit(
+            {
+                "type": "compile_error",
+                "error": f"Line {e.lineno}: {e.msg}" + (f"\n    {e.text.rstrip()}" if e.text else ""),
+            }
+        )
         return
     load_out = CappedIO(MAX_STDOUT)
-    sys.stdout = sys.stderr = load_out
+    sys.stdout = sys.stderr = cast(TextIO, load_out)
     try:
         signal.setitimer(signal.ITIMER_REAL, tl)
         exec(compiled, ns)
         signal.setitimer(signal.ITIMER_REAL, 0)
     except TimeLimitExceeded:
-        emit({"type": "compile_error", "error": "Time limit exceeded while loading your code (check for top-level loops)."})
+        emit(
+            {
+                "type": "compile_error",
+                "error": "Time limit exceeded while loading your code (check for top-level loops).",
+            }
+        )
         return
-    except BaseException as e:  # noqa: BLE001 — anything the user raises at import time
+    except BaseException as e:  # anything the user raises at import time
         signal.setitimer(signal.ITIMER_REAL, 0)
         emit({"type": "compile_error", "error": user_traceback(e)})
         return
     finally:
-        sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__
+        sys.stdout, sys.stderr = real_stdout, real_stderr
 
     if kind == "design":
-        target = ns.get(entry)
+        target: Any = ns.get(entry)
         if not isinstance(target, type):
-            emit({"type": "compile_error", "error": f"Couldn't find class {entry}. Keep the class name from the starter code."})
+            emit(
+                {
+                    "type": "compile_error",
+                    "error": f"Couldn't find class {entry}. Keep the class name from the starter code.",
+                }
+            )
             return
     else:
-        sol_cls = ns.get("Solution")
+        sol_cls: Any = ns.get("Solution")
         if not isinstance(sol_cls, type) or not callable(getattr(sol_cls, entry, None)):
-            emit({"type": "compile_error", "error": f"Couldn't find Solution.{entry}. Keep the class and method names from the starter code."})
+            emit(
+                {
+                    "type": "compile_error",
+                    "error": f"Couldn't find Solution.{entry}. Keep the class and method names from the starter code.",
+                }
+            )
             return
 
     emit({"type": "ready"})
 
     for i, raw in enumerate(tests):
         buf = CappedIO(MAX_STDOUT)
-        sys.stdout = sys.stderr = buf
-        result = {"type": "result", "index": i}
+        sys.stdout = sys.stderr = cast(TextIO, buf)
+        result: dict[str, Any] = {"type": "result", "index": i}
         t0 = time.perf_counter()
         try:
             signal.setitimer(signal.ITIMER_REAL, tl)
@@ -433,8 +511,8 @@ def main():
                 spec = raw[0] if isinstance(raw, list) else raw
                 ops, op_args = spec["ops"], spec["args"]
                 obj = target(*op_args[0])
-                value = [None]
-                for op, a in zip(ops[1:], op_args[1:]):
+                value: Any = [None]
+                for op, a in zip(ops[1:], op_args[1:], strict=False):
                     value.append(getattr(obj, op)(*a))
             else:
                 args = convert_args(raw, param_types)
@@ -457,11 +535,11 @@ def main():
         except RecursionError as e:
             signal.setitimer(signal.ITIMER_REAL, 0)
             result.update(ok=False, error_type="runtime", error=user_traceback(e))
-        except BaseException as e:  # noqa: BLE001
+        except BaseException as e:
             signal.setitimer(signal.ITIMER_REAL, 0)
             result.update(ok=False, error_type="runtime", error=user_traceback(e))
         finally:
-            sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__
+            sys.stdout, sys.stderr = real_stdout, real_stderr
         result["stdout"] = buf.getvalue()
         emit(result)
         if result.get("error_type") in ("timeout", "memory"):

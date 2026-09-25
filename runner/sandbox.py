@@ -1,4 +1,6 @@
 """Spawns the harness in a locked-down child process and collects its results."""
+
+import contextlib
 import json
 import os
 import resource
@@ -7,7 +9,9 @@ import signal
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 DONE_MARKER = b'{"type": "done"}'
 HARNESS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "harness.py")
@@ -29,8 +33,8 @@ class Limits:
 LIMITS = Limits()
 
 
-def _preexec(uid: int, cpu_s: int, lim: Limits):
-    def fn():
+def _preexec(uid: int, cpu_s: int, lim: Limits) -> Callable[[], None]:
+    def fn() -> None:
         os.setsid()  # own process group so we can kill everything it spawns
         mem = lim.memory_mb * 1024 * 1024
         resource.setrlimit(resource.RLIMIT_AS, (mem, mem))
@@ -44,10 +48,11 @@ def _preexec(uid: int, cpu_s: int, lim: Limits):
             os.setgroups([])
             os.setgid(uid)
             os.setuid(uid)
+
     return fn
 
 
-def _kill_uid(uid: int):
+def _kill_uid(uid: int) -> None:
     """SIGKILL every process owned by a sandbox uid (catches anything that escaped the process group)."""
     for pid in os.listdir("/proc"):
         if not pid.isdigit():
@@ -59,7 +64,7 @@ def _kill_uid(uid: int):
             pass
 
 
-def run_job(job: dict, slot: int, lim: Limits = LIMITS) -> dict:
+def run_job(job: dict[str, Any], slot: int, lim: Limits = LIMITS) -> dict[str, Any]:
     uid = lim.base_uid + slot
     n = max(1, len(job.get("tests", [])))
     per_test = max(0.05, job.get("time_limit_ms", 2000) / 1000)
@@ -72,16 +77,24 @@ def run_job(job: dict, slot: int, lim: Limits = LIMITS) -> dict:
     started = time.monotonic()
     proc = subprocess.Popen(
         [lim.python, "-I", "-B", HARNESS],
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        cwd=lim.workdir, env=env, close_fds=True, preexec_fn=_preexec(uid, cpu, lim),
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=lim.workdir,
+        env=env,
+        close_fds=True,
+        preexec_fn=_preexec(uid, cpu, lim),
     )
+    assert proc.stdin is not None and proc.stdout is not None and proc.stderr is not None  # all are PIPEs
     try:
         proc.stdin.write(payload)
         proc.stdin.close()
     except BrokenPipeError:
         pass
 
-    chunks, total, killed_reason = [], 0, None
+    chunks: list[bytes] = []
+    total = 0
+    killed_reason: str | None = None
     sel = selectors.DefaultSelector()
     sel.register(proc.stdout, selectors.EVENT_READ)
     sel.register(proc.stderr, selectors.EVENT_READ)
@@ -92,7 +105,7 @@ def run_job(job: dict, slot: int, lim: Limits = LIMITS) -> dict:
             killed_reason = "timeout"
             break
         for key, _ in sel.select(timeout=remaining):
-            data = os.read(key.fileobj.fileno(), 65536)
+            data = os.read(key.fd, 65536)
             if not data:
                 sel.unregister(key.fileobj)
                 open_streams -= 1
@@ -111,18 +124,16 @@ def run_job(job: dict, slot: int, lim: Limits = LIMITS) -> dict:
     sel.close()
 
     if killed_reason or proc.poll() is None:
-        try:
+        with contextlib.suppress(ProcessLookupError):
             os.killpg(proc.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-    try:
+    with contextlib.suppress(subprocess.TimeoutExpired):
         proc.wait(timeout=2)
-    except subprocess.TimeoutExpired:
-        pass
     if lim.drop_privileges:
         _kill_uid(uid)
 
-    results, status, error, got_done = [], "ok", None, False
+    results: list[dict[str, Any]] = []
+    status, got_done = "ok", False
+    error: str | None = None
     for line in b"".join(chunks).decode("utf-8", "replace").splitlines():
         try:
             msg = json.loads(line)
@@ -152,8 +163,12 @@ def run_job(job: dict, slot: int, lim: Limits = LIMITS) -> dict:
                     status, error = "crashed", f"Process was killed by {sig}{hint}"
             else:
                 status, error = "crashed", f"Process exited unexpectedly (code {rc})"
-    return {"status": status, "error": error, "results": results,
-            "elapsed_ms": round((time.monotonic() - started) * 1000)}
+    return {
+        "status": status,
+        "error": error,
+        "results": results,
+        "elapsed_ms": round((time.monotonic() - started) * 1000),
+    }
 
 
 if __name__ == "__main__":  # manual test: python sandbox.py < job.json

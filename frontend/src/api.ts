@@ -50,14 +50,18 @@ export const api = {
     req<void>(`${sp(sessionId, slug)}/draft`, { method: "PUT", body: JSON.stringify({ code }) }),
   resetDraft: (sessionId: string, slug: string) => req<void>(`${sp(sessionId, slug)}/draft`, { method: "DELETE" }),
   run: (sessionId: string, slug: string, code: string, cases: unknown[][]) =>
-    req<RunResult>(`${sp(sessionId, slug)}/run`, { method: "POST", body: JSON.stringify({ code, cases } satisfies Schemas["RunIn"]) }),
+    req<RunResult>(`${sp(sessionId, slug)}/run`, {
+      method: "POST",
+      body: JSON.stringify({ code, cases } satisfies Schemas["RunIn"]),
+    }),
   submit: (sessionId: string, slug: string, code: string) =>
     req<SubmitResult>(`${sp(sessionId, slug)}/submit`, { method: "POST", body: JSON.stringify({ code }) }),
   submissions: (sessionId: string, slug: string) => req<Submission[]>(`${sp(sessionId, slug)}/submissions`),
   chat: (sessionId: string, slug: string) => req<Schemas["ChatHistory"]>(`${sp(sessionId, slug)}/chat`),
   sendChat: (sessionId: string, slug: string, message: string, code: string) =>
     req<Schemas["ChatReply"]>(`${sp(sessionId, slug)}/chat`, {
-      method: "POST", body: JSON.stringify({ message, code } satisfies Schemas["ChatIn"]),
+      method: "POST",
+      body: JSON.stringify({ message, code } satisfies Schemas["ChatIn"]),
     }),
   clearChat: (sessionId: string, slug: string) => req<void>(`${sp(sessionId, slug)}/chat`, { method: "DELETE" }),
 };

@@ -1,4 +1,6 @@
-.PHONY: up down logs dev-api dev-web test-sandbox test-api gen-api check-api
+.PHONY: up down logs dev-web lint format test test-sandbox gen-api check-api
+
+PNPM := corepack pnpm
 
 up:            ## build and start everything at http://localhost:8080
 	@test -f .env || (cp .env.example .env && sed -i.bak "s/change-me/$$(openssl rand -hex 32)/" .env && rm -f .env.bak)
@@ -11,23 +13,28 @@ logs:
 	docker compose logs -f api runner
 
 dev-web:       ## hot-reload frontend on :5173 against the dockerized API
-	cd frontend && npm install && npm run dev
+	cd frontend && $(PNPM) install && $(PNPM) dev
+
+lint:          ## ruff for all Python, mypy for the API and runner, Biome for the web app
+	uv run --project backend ruff check . && uv run --project backend ruff format --check .
+	cd backend && uv run mypy && uv run mypy --platform linux ../runner
+	cd frontend && $(PNPM) install --frozen-lockfile && $(PNPM) lint && $(PNPM) exec tsc --noEmit
+
+format:        ## auto-fix formatting and safe lint fixes on both sides
+	uv run --project backend ruff format . && uv run --project backend ruff check --fix .
+	cd frontend && $(PNPM) format
+
+test:          ## unit tests (no Docker needed); see test-sandbox for the full runner check
+	cd backend && uv run pytest
+	cd frontend && $(PNPM) test
 
 test-sandbox:  ## run every reference solution + attack cases through the real runner container
 	docker compose run --rm --entrypoint python3 -v $$(pwd)/backend:/backend:ro -v $$(pwd)/scripts:/scripts:ro runner /scripts/validate_catalog.py
 
-PY = cd backend && uv run -q --python 3.12 --with-requirements requirements.txt --with-requirements requirements-dev.txt
-TYPED = app/schemas.py app/chat.py
-
-test-api:      ## backend unit tests + ruff/mypy on the typed modules
-	$(PY) pytest -q
-	$(PY) ruff check $(TYPED) tests
-	$(PY) ruff format --check $(TYPED) tests
-	$(PY) mypy --strict --follow-imports=silent $(TYPED)
-
-gen-api:       ## regenerate frontend/src/api.gen.ts from the FastAPI models
-	$(PY) python -c "import json; from app.main import app; print(json.dumps(app.openapi()))" > ../frontend/openapi.json
-	cd frontend && npx openapi-typescript openapi.json -o src/api.gen.ts && rm openapi.json
+gen-api:       ## regenerate frontend/src/api.gen.ts from the FastAPI models (backend/app/schemas.py)
+	cd backend && uv run python -c "import json; from app.main import app; print(json.dumps(app.openapi()))" > ../frontend/openapi.json
+	cd frontend && $(PNPM) exec openapi-typescript openapi.json -o src/api.gen.ts && rm openapi.json
+	cd frontend && $(PNPM) exec biome format --write src/api.gen.ts
 
 check-api:     ## fail if api.gen.ts is stale
 	$(MAKE) gen-api

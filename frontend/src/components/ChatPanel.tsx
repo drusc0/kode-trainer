@@ -1,9 +1,19 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { api, type ChatMessage } from "../api";
 import Markdown from "./Markdown";
 
 // Stays mounted while hidden so an in-flight reply (or its error and the restored draft) survives tab switches.
-export default function ChatPanel({ sessionId, slug, code, hidden }: { sessionId: string; slug: string; code: string; hidden: boolean }) {
+export default function ChatPanel({
+  sessionId,
+  slug,
+  code,
+  hidden,
+}: {
+  sessionId: string;
+  slug: string;
+  code: string;
+  hidden: boolean;
+}) {
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -16,9 +26,12 @@ export default function ChatPanel({ sessionId, slug, code, hidden }: { sessionId
       (h) => !cancelled && setMessages(h.messages),
       (e: Error) => !cancelled && setError(e.message),
     );
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [sessionId, slug]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: these are re-scroll triggers, not values read inside
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages, busy, hidden]);
@@ -59,8 +72,8 @@ export default function ChatPanel({ sessionId, slug, code, hidden }: { sessionId
       {messages === null && !error && <p className="muted">Loading chat…</p>}
       {messages?.length === 0 && (
         <p className="muted">
-          Talk the problem through: ask for a hint, another example, edge cases, or feedback on your code.
-          Your current code is shared with every message.
+          Talk the problem through: ask for a hint, another example, edge cases, or feedback on your code. Your current
+          code is shared with every message.
         </p>
       )}
       {messages?.map((m, i) => (
@@ -81,9 +94,15 @@ export default function ChatPanel({ sessionId, slug, code, hidden }: { sessionId
           disabled={busy}
         />
         <div className="chat-actions">
-          <button className="btn primary" onClick={() => void send()} disabled={busy || !draft.trim()}>Send</button>
+          <button type="button" className="btn primary" onClick={() => void send()} disabled={busy || !draft.trim()}>
+            Send
+          </button>
           <div className="grow" />
-          {!!messages?.length && <button className="linkish" onClick={() => void clear()} disabled={busy}>Clear chat</button>}
+          {!!messages?.length && (
+            <button type="button" className="linkish" onClick={() => void clear()} disabled={busy}>
+              Clear chat
+            </button>
+          )}
         </div>
       </div>
     </div>

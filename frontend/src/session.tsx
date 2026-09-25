@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { api, type Session, type Target } from "./api";
 
 const CURRENT_KEY = "kodetrain:session";
@@ -30,7 +30,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         list = [await api.createSession({ name: "General practice", target: "general", notes: "" })];
       }
       setSessions(list);
-      setCurrentId((id) => (id && list.some((s) => s.id === id) ? id : list[0]?.id ?? null));
+      setCurrentId((id) => (id && list.some((s) => s.id === id) ? id : (list[0]?.id ?? null)));
       setError(null);
     } catch (e) {
       setError((e as Error).message);

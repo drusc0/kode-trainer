@@ -6,8 +6,9 @@ import pytest
 from anthropic import AsyncAnthropic
 from fastapi.testclient import TestClient
 
-from app import chat
-from app.catalog import BY_SLUG
+from app import chat, judge
+from app.catalog import BY_SLUG, PROBLEMS
+from app.catalog.base import Problem
 from app.core import settings
 from app.main import app
 from app.schemas import ChatMessage, Example
@@ -102,3 +103,12 @@ def test_reply_without_text_raises_chat_error() -> None:
     client, _ = fake_client("  \n")
     with pytest.raises(chat.ChatError):
         asyncio.run(chat.reply(client, "m", "S", [], "x"))
+
+
+@pytest.mark.parametrize("p", PROBLEMS, ids=lambda p: p.slug)
+def test_system_prompt_builds_for_every_problem(p: Problem) -> None:
+    examples = [
+        Example(args=[judge.preview(v) for v in judge.to_editor(p, ex["args"])], output="x") for ex in p.examples
+    ]
+    prompt = chat.build_system_prompt(p, examples)
+    assert f"Example {len(examples)}:" in prompt

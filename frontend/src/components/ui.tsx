@@ -5,22 +5,46 @@ export function DifficultyTag({ d }: { d: Difficulty }) {
 }
 
 export function StatusMark({ status }: { status: Status }) {
-  if (status === "solved") return <span className="status solved" title="Solved in this session">✓</span>;
-  if (status === "attempted") return <span className="status attempted" title="Attempted, not solved yet">◐</span>;
+  if (status === "solved")
+    return (
+      <span className="status solved" title="Solved in this session">
+        ✓
+      </span>
+    );
+  if (status === "attempted")
+    return (
+      <span className="status attempted" title="Attempted, not solved yet">
+        ◐
+      </span>
+    );
   return <span className="status none" aria-hidden="true" />;
 }
 
-export function Progress({ value, total, label, tone }: { value: number; total: number; label?: string; tone?: string }) {
+export function Progress({
+  value,
+  total,
+  label,
+  tone,
+}: {
+  value: number;
+  total: number;
+  label?: string;
+  tone?: string;
+}) {
   const pct = total ? Math.round((value / total) * 100) : 0;
   return (
     <div className="progress">
       {label && (
         <div className="progress-head">
           <span>{label}</span>
-          <span className="mono">{value}/{total}</span>
+          <span className="mono">
+            {value}/{total}
+          </span>
         </div>
       )}
-      <div className="bar"><div className={`fill ${tone ?? ""}`} style={{ width: `${pct}%` }} /></div>
+      <div className="bar">
+        <div className={`fill ${tone ?? ""}`} style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }
@@ -29,8 +53,14 @@ export function Progress({ value, total, label, tone }: { value: number; total: 
 export function ResultStrip({ cells }: { cells: ("pass" | "fail" | "skip")[] }) {
   const shown = cells.length > 60 ? compress(cells) : cells;
   return (
-    <div className="strip" aria-label={`${cells.filter((c) => c === "pass").length} of ${cells.length} passed`}>
-      {shown.map((c, i) => <i key={i} className={`c ${c}`} />)}
+    <div
+      className="strip"
+      role="img"
+      aria-label={`${cells.filter((c) => c === "pass").length} of ${cells.length} passed`}
+    >
+      {shown.map((c, i) => (
+        <i key={i} className={`c ${c}`} />
+      ))}
     </div>
   );
 }

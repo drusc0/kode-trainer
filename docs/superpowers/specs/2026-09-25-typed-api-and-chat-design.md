@@ -126,3 +126,12 @@ A manual end-to-end check with a real key: ask for a hint, ask for another examp
 - LangGraph and multi-step mock-interview flows
 - Hiding examples or hints (an interview mode)
 - Retrofitting ruff/mypy onto the existing backend modules
+
+## Update: merged with main's tooling (2026-09-25)
+
+`main` adopted uv + `pyproject.toml`, a repo-root `ruff.toml`, mypy strict over all of `backend/`, and pnpm + Biome + Vitest for the frontend. The merge adopts all of it, and this spec's interim tooling is gone:
+
+- `backend/requirements*.txt`, `backend/pytest.ini`, `backend/ruff.toml` and `make test-api` were removed. `anthropic` is in `pyproject.toml`/`uv.lock`, and `make lint` / `make test` cover the backend and the frontend.
+- Routes keep `main`'s `-> Doc` return annotations for mypy **and** declare `response_model=` for the OpenAPI contract.
+- `make gen-api` now runs `openapi-typescript` through pnpm, then formats the result with Biome, so `make check-api` and `make lint` agree on the generated file.
+- `build_system_prompt` uses `zip(..., strict=True)` (ruff B905). A parametrized test builds the prompt for every catalog problem, so an argument/parameter mismatch fails in tests instead of in a chat.
