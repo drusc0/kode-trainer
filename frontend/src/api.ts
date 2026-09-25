@@ -1,92 +1,19 @@
-export type Difficulty = "Easy" | "Medium" | "Hard";
-export type Target = "google" | "meta" | "general";
-export type Status = "solved" | "attempted" | null;
+import type { components } from "./api.gen";
 
-export interface Session {
-  id: string;
-  name: string;
-  target: Target;
-  notes: string;
-  created_at: string;
-  last_active_at: string | null;
-  solved: number;
-  attempted: number;
-}
+type Schemas = components["schemas"];
 
-export interface ProblemSummary {
-  slug: string;
-  title: string;
-  difficulty: Difficulty;
-  pattern: string;
-  topics: string[];
-  companies: string[];
-  status: Status;
-  attempts: number;
-}
-
-export interface ProblemDetail extends ProblemSummary {
-  statement: string;
-  constraints: string[];
-  hints: string[];
-  kind: "function" | "design";
-  fields: { name: string; type: string }[];
-  examples: { args: string[]; output: string | null; note?: string | null }[];
-  default_cases: string[][];
-  starter_code: string;
-  draft: string | null;
-}
-
-export interface CaseResult {
-  args: string[];
-  ok?: boolean;
-  output?: string;
-  expected?: string | null;
-  stdout?: string;
-  error?: string | null;
-  ms?: number | null;
-  input_error?: string;
-}
-
-export interface RunResult {
-  verdict: string;
-  compile_error: string | null;
-  cases: CaseResult[];
-  passed: number;
-  runtime_ms: number | null;
-}
-
-export interface SubmitResult {
-  submission_id: string;
-  verdict: string;
-  passed: number;
-  total: number;
-  compile_error: string | null;
-  runtime_ms: number | null;
-  failing: (CaseResult & { index: number; is_example: boolean }) | null;
-}
-
-export interface Submission {
-  id: string;
-  verdict: string;
-  passed: number;
-  total: number;
-  runtime_ms: number | null;
-  created_at: string;
-  code: string;
-}
-
-export interface Bucket {
-  solved: number;
-  total: number;
-}
-
-export interface SessionStats {
-  by_difficulty: Record<Difficulty, Bucket>;
-  by_pattern: Record<string, Bucket>;
-  submissions: number;
-  accepted: number;
-  recent: { id: string; problem: string; title: string; verdict: string; created_at: string; runtime_ms: number | null }[];
-}
+export type Session = Schemas["Session"];
+export type ProblemSummary = Schemas["ProblemSummary"];
+export type ProblemDetail = Schemas["ProblemDetail"];
+export type CaseResult = Schemas["CaseResult"];
+export type RunResult = Schemas["RunResult"];
+export type SubmitResult = Schemas["SubmitResult"];
+export type Submission = Schemas["Submission"];
+export type Bucket = Schemas["Bucket"];
+export type SessionStats = Schemas["SessionStats"];
+export type Difficulty = ProblemSummary["difficulty"];
+export type Target = Session["target"];
+export type Status = ProblemSummary["status"];
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, { headers: { "Content-Type": "application/json" }, ...init });
@@ -107,13 +34,13 @@ const q = (sessionId?: string | null) => (sessionId ? `?session_id=${encodeURICo
 const sp = (sessionId: string, slug: string) => `/sessions/${sessionId}/problems/${slug}`;
 
 export const api = {
-  problems: (sessionId?: string | null) => req<{ patterns: string[]; problems: ProblemSummary[] }>(`/problems${q(sessionId)}`),
+  problems: (sessionId?: string | null) => req<Schemas["ProblemList"]>(`/problems${q(sessionId)}`),
   problem: (slug: string, sessionId?: string | null) => req<ProblemDetail>(`/problems/${slug}${q(sessionId)}`),
 
   sessions: () => req<Session[]>("/sessions"),
-  createSession: (body: { name: string; target: Target; notes: string }) =>
+  createSession: (body: Schemas["SessionIn"]) =>
     req<Session>("/sessions", { method: "POST", body: JSON.stringify(body) }),
-  updateSession: (id: string, body: Partial<Pick<Session, "name" | "target" | "notes">>) =>
+  updateSession: (id: string, body: Schemas["SessionPatch"]) =>
     req<Session>(`/sessions/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteSession: (id: string) => req<void>(`/sessions/${id}`, { method: "DELETE" }),
   stats: (id: string) => req<SessionStats>(`/sessions/${id}/stats`),
@@ -122,7 +49,7 @@ export const api = {
     req<void>(`${sp(sessionId, slug)}/draft`, { method: "PUT", body: JSON.stringify({ code }) }),
   resetDraft: (sessionId: string, slug: string) => req<void>(`${sp(sessionId, slug)}/draft`, { method: "DELETE" }),
   run: (sessionId: string, slug: string, code: string, cases: unknown[][]) =>
-    req<RunResult>(`${sp(sessionId, slug)}/run`, { method: "POST", body: JSON.stringify({ code, cases }) }),
+    req<RunResult>(`${sp(sessionId, slug)}/run`, { method: "POST", body: JSON.stringify({ code, cases } satisfies Schemas["RunIn"]) }),
   submit: (sessionId: string, slug: string, code: string) =>
     req<SubmitResult>(`${sp(sessionId, slug)}/submit`, { method: "POST", body: JSON.stringify({ code }) }),
   submissions: (sessionId: string, slug: string) => req<Submission[]>(`${sp(sessionId, slug)}/submissions`),
