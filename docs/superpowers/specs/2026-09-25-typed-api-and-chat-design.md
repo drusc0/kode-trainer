@@ -28,9 +28,9 @@ These ship as two atomic commits: a behavior-neutral `refactor:` first, then a `
 ### Backend
 
 - New `backend/app/schemas.py` holds every request and response model. `SessionIn`, `SessionPatch`, `CodeIn` and `RunIn` move here from `main.py`. New models:
-  - `Session`, `ProblemSummary`, `ProblemList {patterns, problems}`, `Example`, `Field`, `ProblemDetail`
+  - `Session`, `ProblemSummary`, `ProblemList {patterns, problems}`, `Example`, `EditorField` (not `Field`, which would shadow Pydantic's), `ProblemDetail`
   - `CaseResult`, `RunResult`, `FailingCase` (a `CaseResult` plus `index` and `is_example`), `SubmitResult`
-  - `Submission`, `Bucket`, `RecentSubmission`, `SessionStats`
+  - `Submission`, `Bucket`, `DifficultyBuckets {Easy, Medium, Hard}` (explicit fields, so `stats.by_difficulty.Easy` stays typed), `RecentSubmission`, `SessionStats`
 - Every JSON route declares `response_model=`. Helpers and `judge.py` may keep building dicts; FastAPI validates them against the model and serializes them. This keeps the diff small and still checks every response.
 - Field names, optionality and HTTP behavior stay exactly as they are today. The TypeScript interfaces in `api.ts` are the reference for what the frontend already relies on.
 
@@ -38,9 +38,9 @@ These ship as two atomic commits: a behavior-neutral `refactor:` first, then a `
 
 - `openapi-typescript` is added as a frontend **dev** dependency.
 - `make gen-api` does two things:
-  1. Dumps `app.openapi()` from the api container. It runs `docker compose run --rm --no-deps` with `backend/app` mounted, so it needs no Mongo, runner or rebuild.
+  1. Dumps `app.openapi()` by importing the app under `uv run --python 3.12 --with-requirements` (the same env the tests use). It needs no Docker, Mongo or runner.
   2. Runs `npx openapi-typescript` to write `frontend/src/api.gen.ts`.
-- `make check-api` regenerates the file into a temp path and diffs it against the committed copy. A non-zero exit means the copy is stale.
+- `make check-api` runs `gen-api`, then `git diff --exit-code` on the generated file. A non-zero exit means the committed copy is stale.
 - In `frontend/src/api.ts`, the hand-written interfaces become aliases such as `export type ProblemDetail = components["schemas"]["ProblemDetail"]`. Page components keep their imports unchanged. The `req` helper, the `api` object, `timeAgo` and `TARGET_LABEL` stay as they are.
 
 ### Tests
@@ -84,12 +84,12 @@ Error handling:
 
 ### `backend/app/chat.py`
 
-- `build_system_prompt(problem, code) -> str` builds the prompt from:
+- `build_system_prompt(problem, examples) -> str` builds the prompt from:
   - the persona rules
   - the problem's title, statement, **all** examples with their expected outputs, constraints and hints
   - the **reference solution**, marked hidden: use it to judge the user's reasoning, never reveal it
-  - the user's current editor code
-- `async reply(client, model, problem, history, message, code) -> str` makes a single `messages.create` call. The client is passed in so tests can fake it.
+- `user_turn(message, code) -> str` attaches the current editor code to the outgoing user turn only. This keeps the system prompt stable per problem, so prompt caching works. Stored history keeps just the typed message.
+- `async reply(client, model, system, history, turn) -> str` makes a single `messages.create` call with top-level auto-caching. The client is passed in so tests can fake it. SDK errors and `refusal` stops become `ChatError`.
 - The route in `main.py` is thin glue: it loads the history, calls `reply`, persists the result and returns it.
 
 Persona rules in the prompt:
@@ -114,7 +114,7 @@ Persona rules in the prompt:
 ### Tests
 
 `backend/tests/test_chat.py`:
-- The prompt includes the statement, every example, the hints, the reference solution and the user's code.
+- The system prompt includes the statement, every example with its output, the hints and the reference solution. The user turn includes the code.
 - `reply` sends the history plus the new message, in order, to a fake client and returns the fake client's text.
 - The history cap keeps only the last 40 messages.
 
