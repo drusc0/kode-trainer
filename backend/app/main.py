@@ -2,17 +2,19 @@ import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
-from typing import Any, Literal
 
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
 
 from . import judge
 from .catalog import PATTERNS, PROBLEMS, Problem
 from .core import RunnerError, db, ensure_indexes, now, settings
+from .schemas import (
+    CodeIn, Example, Health, ProblemDetail, ProblemList, RunIn, RunResult, Session, SessionIn, SessionPatch,
+    SessionStats, Submission, SubmitResult,
+)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -27,30 +29,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="KodeTrain API", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["*"], allow_headers=["*"])
-
-
-# ---------------------------------------------------------------- models
-Target = Literal["google", "meta", "general"]
-
-
-class SessionIn(BaseModel):
-    name: str = Field(min_length=1, max_length=80)
-    target: Target = "general"
-    notes: str = Field(default="", max_length=2000)
-
-
-class SessionPatch(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=80)
-    target: Target | None = None
-    notes: str | None = Field(default=None, max_length=2000)
-
-
-class CodeIn(BaseModel):
-    code: str = Field(max_length=settings.max_code_bytes)
-
-
-class RunIn(CodeIn):
-    cases: list[list[Any]] = Field(min_length=1, max_length=settings.max_custom_cases)
 
 
 # ---------------------------------------------------------------- helpers
@@ -95,27 +73,31 @@ async def progress_map(session_id: str | None) -> dict[str, dict]:
 
 
 # ---------------------------------------------------------------- health
-@app.get("/api/health")
+@app.get("/api/health", response_model=Health)
 async def health():
     return {"ok": True, "seeding": judge.seed_state}
 
 
 # ---------------------------------------------------------------- problems
-@app.get("/api/problems")
+@app.get("/api/problems", response_model=ProblemList)
 async def list_problems(session_id: str | None = None):
     prog = await progress_map(session_id)
     return {"patterns": PATTERNS, "problems": [problem_summary(p, prog.get(p.slug)) for p in PROBLEMS]}
 
 
-@app.get("/api/problems/{slug}")
-async def problem_detail(slug: str, session_id: str | None = None):
-    p = get_problem(slug)
-    tests = await db().problem_tests.find_one({"_id": slug}, {"tests": {"$slice": len(p.examples)}, "fingerprint": 1})
-    examples = []
+async def example_views(p: Problem) -> list[Example]:
+    tests = await db().problem_tests.find_one({"_id": p.slug}, {"tests": {"$slice": len(p.examples)}, "fingerprint": 1})
+    out = []
     for i, ex in enumerate(p.examples):
         exp = tests["tests"][i]["expected"] if tests and i < len(tests["tests"]) else None
-        examples.append({"args": [judge.preview(v) for v in judge.to_editor(p, ex["args"])],
-                         "output": judge.preview(exp) if tests else None, "note": ex.get("note")})
+        out.append(Example(args=[judge.preview(v) for v in judge.to_editor(p, ex["args"])],
+                           output=judge.preview(exp) if tests else None, note=ex.get("note")))
+    return out
+
+
+@app.get("/api/problems/{slug}", response_model=ProblemDetail)
+async def problem_detail(slug: str, session_id: str | None = None):
+    p = get_problem(slug)
     draft, prog = None, None
     if session_id:
         d = await db().drafts.find_one({"session_id": session_id, "problem": slug})
@@ -123,14 +105,14 @@ async def problem_detail(slug: str, session_id: str | None = None):
         prog = await db().progress.find_one({"session_id": session_id, "problem": slug})
     return {
         **problem_summary(p, prog), "statement": p.statement, "constraints": p.constraints, "hints": p.hints,
-        "kind": p.kind, "fields": judge.editor_fields(p), "examples": examples,
+        "kind": p.kind, "fields": judge.editor_fields(p), "examples": await example_views(p),
         "default_cases": [[json.dumps(v) for v in judge.to_editor(p, ex["args"])] for ex in p.examples],
         "starter_code": p.starter_code(), "draft": draft,
     }
 
 
 # ---------------------------------------------------------------- sessions
-@app.get("/api/sessions")
+@app.get("/api/sessions", response_model=list[Session])
 async def list_sessions():
     counts = {}
     async for row in db().progress.aggregate([{"$group": {"_id": "$session_id",
@@ -144,7 +126,7 @@ async def list_sessions():
     return out
 
 
-@app.post("/api/sessions", status_code=201)
+@app.post("/api/sessions", status_code=201, response_model=Session)
 async def create_session(body: SessionIn):
     doc = {**body.model_dump(), "created_at": now(), "last_active_at": now()}
     res = await db().sessions.insert_one(doc)
@@ -152,7 +134,7 @@ async def create_session(body: SessionIn):
     return session_out(doc)
 
 
-@app.patch("/api/sessions/{session_id}")
+@app.patch("/api/sessions/{session_id}", response_model=Session)
 async def update_session(session_id: str, body: SessionPatch):
     s = await get_session(session_id)
     changes = {k: v for k, v in body.model_dump().items() if v is not None}
@@ -170,7 +152,7 @@ async def delete_session(session_id: str):
     await db().sessions.delete_one({"_id": s["_id"]})
 
 
-@app.get("/api/sessions/{session_id}/stats")
+@app.get("/api/sessions/{session_id}/stats", response_model=SessionStats)
 async def session_stats(session_id: str):
     await get_session(session_id)
     prog = await progress_map(session_id)
@@ -206,7 +188,7 @@ async def reset_draft(session_id: str, slug: str):
 
 
 # ---------------------------------------------------------------- run & submit
-@app.post("/api/sessions/{session_id}/problems/{slug}/run")
+@app.post("/api/sessions/{session_id}/problems/{slug}/run", response_model=RunResult)
 async def run(session_id: str, slug: str, body: RunIn):
     await get_session(session_id)
     p = get_problem(slug)
@@ -218,7 +200,7 @@ async def run(session_id: str, slug: str, body: RunIn):
         raise HTTPException(503, str(e))
 
 
-@app.post("/api/sessions/{session_id}/problems/{slug}/submit")
+@app.post("/api/sessions/{session_id}/problems/{slug}/submit", response_model=SubmitResult)
 async def submit(session_id: str, slug: str, body: CodeIn):
     s = await get_session(session_id)
     p = get_problem(slug)
@@ -248,7 +230,7 @@ async def submit(session_id: str, slug: str, body: CodeIn):
     return {"submission_id": str(ins.inserted_id), **result}
 
 
-@app.get("/api/sessions/{session_id}/problems/{slug}/submissions")
+@app.get("/api/sessions/{session_id}/problems/{slug}/submissions", response_model=list[Submission])
 async def list_submissions(session_id: str, slug: str, limit: int = Query(30, le=100)):
     await get_session(session_id)
     out = []
