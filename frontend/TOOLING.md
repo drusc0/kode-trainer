@@ -1,13 +1,13 @@
 # Frontend tooling
 
-**Status:** adopted 2026-09-25 · **Scope:** `frontend/` (React 18 + Vite SPA, served by nginx)
+**Status:** adopted 2026-09-25 · **Scope:** `frontend/` (React 18 + Vite 8 SPA, served by nginx)
 
 | Job | Tool | Command |
 |---|---|---|
 | Package manager | [pnpm](https://pnpm.io/) 12 via corepack (pinned in `packageManager`) | `corepack pnpm install` (or `corepack enable` once, then `pnpm …`) |
 | Lint + format + import sorting | [Biome](https://biomejs.dev/) 2 | `pnpm lint` (check) · `pnpm format` (write) |
 | Type checking | `tsc --noEmit` (unchanged, part of `pnpm build`) | `pnpm exec tsc --noEmit` |
-| Tests | [Vitest](https://vitest.dev/) 3 + Testing Library + jsdom | `pnpm test` |
+| Tests | [Vitest](https://vitest.dev/) 5 + Testing Library + jsdom | `pnpm test` |
 
 From the repo root, `make lint` and `make test` run all of these (plus the backend's checks).
 
@@ -18,7 +18,8 @@ The actual problem was reproducibility. No lockfile was committed, and the Docke
 
 - **Strict `node_modules`.** Code can only import packages it declares. npm's hoisting lets undeclared ("phantom") imports work locally and then break later.
 - **Fast installs and a shared content-addressed store**, which saves disk across projects and worktrees.
-- **Build scripts off by default.** Dependencies can't run install scripts unless allowed. `pnpm-workspace.yaml` allows only `esbuild` (Vite needs its binary), which closes a common supply-chain attack path.
+- **Build scripts off by default.** Dependencies can't run install scripts unless explicitly allowed, which closes a common supply-chain attack path. None are allowed today: Vite 8 bundles with Rolldown and no longer needs esbuild's install script. If a future dependency needs one, allow it by name under `allowBuilds` in a `pnpm-workspace.yaml`, and copy that file in the Dockerfile.
+- **Minimum release age.** pnpm 12 refuses versions published less than a day ago, even when they're already in the lockfile (`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`). That's why Vitest resolves to 5.0.1 rather than 5.0.2, which was released on upgrade day. Wait out the cutoff rather than relaxing the policy. If a brand-new version was already locked, `pnpm clean --lockfile && pnpm install` re-resolves under the policy.
 - **Pinned through corepack.** The `packageManager` field pins the exact pnpm version, and Node 24's corepack fetches it, so there's nothing to install globally.
 
 Rejected alternatives:
@@ -43,7 +44,7 @@ Rejected alternatives:
 ### Vitest, not Jest
 - It reuses `vite.config.ts` (same JSX transform, aliases and `import.meta.glob`), so there's no second Babel/ts-jest pipeline to keep in sync. The config is just `test: { environment: "jsdom" }`.
 - It's Jest-compatible (`describe`, `it`, `expect`) and fast in watch mode (`pnpm exec vitest`).
-- It's pinned to **Vitest 3** because the app is on Vite 5. Vitest 4 and later need newer Vite. Upgrade both together.
+- Vitest's major version tracks Vite's (Vitest 5 supports Vite 6.4 to 8), so upgrade both together. `@vitejs/plugin-react` 6 requires Vite 8.
 - Current tests:
   - `components/ui.test.tsx` checks that the result strip renders one cell per test, compresses long runs to 60 cells without ever hiding a failure, and announces the pass count, plus the verdict → colour mapping.
   - `content/patterns.test.ts` checks that every pattern has a non-empty guide. `patternBody` silently falls back to `""`, so a renamed `.md` would otherwise ship a blank page.
