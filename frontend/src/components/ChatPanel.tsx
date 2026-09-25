@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { api, type ChatMessage } from "../api";
 import Markdown from "./Markdown";
 
-export default function ChatPanel({ sessionId, slug, code }: { sessionId: string; slug: string; code: string }) {
+// Stays mounted while hidden so an in-flight reply (or its error and the restored draft) survives tab switches.
+export default function ChatPanel({ sessionId, slug, code, hidden }: { sessionId: string; slug: string; code: string; hidden: boolean }) {
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -20,7 +21,7 @@ export default function ChatPanel({ sessionId, slug, code }: { sessionId: string
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages, busy]);
+  }, [messages, busy, hidden]);
 
   const send = async () => {
     const text = draft.trim();
@@ -54,7 +55,7 @@ export default function ChatPanel({ sessionId, slug, code }: { sessionId: string
   };
 
   return (
-    <div className="chat">
+    <div className="chat" hidden={hidden}>
       {messages === null && !error && <p className="muted">Loading chat…</p>}
       {messages?.length === 0 && (
         <p className="muted">

@@ -197,9 +197,8 @@ export default function WorkspacePage() {
             </article>
           ) : leftTab === "submissions" ? (
             <SubmissionsList subs={submissions} onLoad={(c) => setCode(c)} />
-          ) : (
-            <ChatPanel key={slug} sessionId={sessionId} slug={slug} code={code} />
-          )}
+          ) : null}
+          <ChatPanel key={slug} sessionId={sessionId} slug={slug} code={code} hidden={leftTab !== "chat"} />
         </div>
       </section>
 
