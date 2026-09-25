@@ -1,7 +1,7 @@
 # Typed API contract + problem chat assistant
 
 - **Date:** 2026-09-25
-- **Status:** Draft, awaiting review
+- **Status:** Implemented
 - **Branch:** `claude/interview-prep-chat-78f70c`
 
 ## Goal

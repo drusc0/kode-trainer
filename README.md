@@ -22,6 +22,8 @@ make up                  # creates .env with a random RUNNER_TOKEN, builds and s
 open http://localhost:8080
 ```
 
+To enable the chat assistant, add your Anthropic key to `.env` (`ANTHROPIC_API_KEY=...`) and run `make up` again.
+
 On first start the API **seeds** the problems: it runs each reference solution in the sandbox to compute expected outputs for the hidden tests, which takes about 10–20 seconds. `GET /api/health` shows progress. Seeding only reruns for problems whose definition changed.
 
 Other commands:
@@ -32,6 +34,19 @@ Other commands:
 | `make test-sandbox` | Validate all 53 problems **and** a set of hostile submissions inside the real runner container |
 | `make dev-web` | Vite dev server on :5173 with hot reload, proxying `/api` to the dockerized API on :8000 |
 | `make down` | Stop everything (Mongo data persists in the `mongo-data` volume) |
+| `make test-api` | Backend unit tests, plus ruff and mypy on the typed modules (uses `uv`) |
+| `make gen-api` | Regenerate `frontend/src/api.gen.ts` after changing `backend/app/schemas.py` |
+| `make check-api` | Fail if the committed `api.gen.ts` is out of date |
+
+### Chat assistant
+
+The workspace has a **Chat** tab: a colleague powered by Claude that you can talk the problem through with. It sees the problem, every example, the hints, the hidden reference solution and your current code. It asks what you've tried, gives hints in steps and points at the line in your code that's wrong, but won't write the solution unless you ask for it. Conversations are saved per session and problem.
+
+It needs `ANTHROPIC_API_KEY` in `.env`. `CHAT_MODEL` picks the model (default `claude-sonnet-5`). Without a key everything else works and the tab explains how to turn it on.
+
+### API types
+
+`backend/app/schemas.py` is the single source of truth for request and response shapes. FastAPI publishes them as OpenAPI, and `make gen-api` turns that into TypeScript for the frontend, so `frontend/src/api.ts` only aliases the generated types.
 
 ## Architecture
 
@@ -49,8 +64,9 @@ Other commands:
 - `submissions`: code, verdict, passed/total, runtime and the first failing case, for every Submit
 - `progress`: one per `(session_id, problem)`: attempts, solved, first solve time, best runtime
 - `problem_tests`: hidden tests and expected outputs, keyed by problem with a fingerprint
+- `chats`: one per `(session_id, problem)`; the chat assistant conversation
 
-Deleting a session deletes its drafts, submissions and progress.
+Deleting a session deletes its drafts, submissions, progress and chats.
 
 ### Judging
 
