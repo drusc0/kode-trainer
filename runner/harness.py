@@ -11,6 +11,7 @@ The harness never trusts user output: user prints are captured per test and trun
 A determined user can still tamper with their *own* results (same process), which only
 affects their own practice score; they cannot reach the network, other jobs, or the host.
 """
+
 import io
 import json
 import math
@@ -21,20 +22,59 @@ import time
 import traceback
 from collections import deque
 
-MAX_STDOUT = 16_000          # chars of print() output kept per test
+MAX_STDOUT = 16_000  # chars of print() output kept per test
 MAX_OUTPUT_REPR = 2_000_000  # chars of serialized return value kept
 
 
 # ---------------------------------------------------------------- lockdown
 DENY_SYSCALLS = [
-    "socket", "socketpair", "connect", "bind", "listen", "accept", "accept4",
-    "sendto", "sendmsg", "sendmmsg", "recvfrom", "recvmsg", "recvmmsg",
-    "execve", "execveat", "ptrace", "process_vm_readv", "process_vm_writev",
-    "mount", "umount2", "pivot_root", "chroot", "unshare", "setns",
-    "keyctl", "add_key", "request_key", "bpf", "perf_event_open", "userfaultfd",
-    "io_uring_setup", "io_uring_enter", "io_uring_register", "personality",
-    "open_by_handle_at", "name_to_handle_at", "kexec_load", "reboot", "swapon", "swapoff",
-    "init_module", "finit_module", "delete_module", "acct", "quotactl", "setrlimit", "prlimit64",
+    "socket",
+    "socketpair",
+    "connect",
+    "bind",
+    "listen",
+    "accept",
+    "accept4",
+    "sendto",
+    "sendmsg",
+    "sendmmsg",
+    "recvfrom",
+    "recvmsg",
+    "recvmmsg",
+    "execve",
+    "execveat",
+    "ptrace",
+    "process_vm_readv",
+    "process_vm_writev",
+    "mount",
+    "umount2",
+    "pivot_root",
+    "chroot",
+    "unshare",
+    "setns",
+    "keyctl",
+    "add_key",
+    "request_key",
+    "bpf",
+    "perf_event_open",
+    "userfaultfd",
+    "io_uring_setup",
+    "io_uring_enter",
+    "io_uring_register",
+    "personality",
+    "open_by_handle_at",
+    "name_to_handle_at",
+    "kexec_load",
+    "reboot",
+    "swapon",
+    "swapoff",
+    "init_module",
+    "finit_module",
+    "delete_module",
+    "acct",
+    "quotactl",
+    "setrlimit",
+    "prlimit64",
 ]
 
 
@@ -50,7 +90,7 @@ def lockdown(required: bool) -> None:
         lib = ctypes.CDLL(path, use_errno=True)
     except OSError:
         if required:
-            raise SystemExit("libseccomp not available but required")
+            raise SystemExit("libseccomp not available but required") from None
         return
     lib.seccomp_init.restype = ctypes.c_void_p
     lib.seccomp_init.argtypes = [ctypes.c_uint32]
@@ -122,10 +162,12 @@ def build_tree(vals):
     while q and i < len(vals):
         node = q.popleft()
         if i < len(vals) and vals[i] is not None:
-            node.left = TreeNode(vals[i]); q.append(node.left)
+            node.left = TreeNode(vals[i])
+            q.append(node.left)
         i += 1
         if i < len(vals) and vals[i] is not None:
-            node.right = TreeNode(vals[i]); q.append(node.right)
+            node.right = TreeNode(vals[i])
+            q.append(node.right)
         i += 1
     return root
 
@@ -173,7 +215,7 @@ def base_type(t: str) -> str:
 def convert_args(raw_args, param_types):
     """JSON args -> Python objects the solution expects."""
     out = []
-    for raw, t in zip(raw_args, param_types):
+    for raw, t in zip(raw_args, param_types, strict=False):
         bt = base_type(t)
         if bt == "ListNode":
             out.append(build_list(raw))
@@ -232,7 +274,7 @@ def strict_equal(a, b):
     if isinstance(a, (int, float)) and isinstance(b, (int, float)):
         return a == b
     if isinstance(a, list) and isinstance(b, list):
-        return len(a) == len(b) and all(strict_equal(x, y) for x, y in zip(a, b))
+        return len(a) == len(b) and all(strict_equal(x, y) for x, y in zip(a, b, strict=True))
     if isinstance(a, dict) and isinstance(b, dict):
         return a.keys() == b.keys() and all(strict_equal(a[k], b[k]) for k in a)
     return type(a) is type(b) and a == b
@@ -240,6 +282,10 @@ def strict_equal(a, b):
 
 def _sort_key(x):
     return json.dumps(x, sort_keys=True)
+
+
+def _nested_sorted(groups):
+    return sorted((sorted(x, key=_sort_key) for x in groups), key=_sort_key)
 
 
 def is_valid_parens(s):
@@ -270,14 +316,18 @@ def check(mode, out, exp, args):
         if mode == "nested_sorted":
             if not isinstance(out, list) or not all(isinstance(x, list) for x in out):
                 return False
-            norm = lambda g: sorted((sorted(x, key=_sort_key) for x in g), key=_sort_key)
-            return strict_equal(norm(out), norm(exp))
+            return strict_equal(_nested_sorted(out), _nested_sorted(exp))
         if mode == "float":
             return isinstance(out, (int, float)) and not isinstance(out, bool) and abs(out - exp) < 1e-5
         if mode == "two_sum":
             nums, target = args
-            return (isinstance(out, list) and len(out) == 2 and all(isinstance(i, int) and not isinstance(i, bool) and 0 <= i < len(nums) for i in out)
-                    and out[0] != out[1] and nums[out[0]] + nums[out[1]] == target)
+            return (
+                isinstance(out, list)
+                and len(out) == 2
+                and all(isinstance(i, int) and not isinstance(i, bool) and 0 <= i < len(nums) for i in out)
+                and out[0] != out[1]
+                and nums[out[0]] + nums[out[1]] == target
+            )
         if mode == "peak":
             nums = args[0]
             if not isinstance(out, int) or isinstance(out, bool) or not 0 <= out < len(nums):
@@ -342,7 +392,7 @@ def user_traceback(exc):
     frames = [f for f in traceback.extract_tb(exc.__traceback__) if f.filename == "<solution>"]
     lines = [f"Line {f.lineno} in {f.name}" + (f": {f.line}" if f.line else "") for f in frames[-3:]]
     head = f"{type(exc).__name__}: {exc}"
-    return "\n".join([head] + lines)
+    return "\n".join([head, *lines])
 
 
 PRELUDE = """
@@ -391,7 +441,12 @@ def main():
     try:
         compiled = compile(code, "<solution>", "exec")
     except SyntaxError as e:
-        emit({"type": "compile_error", "error": f"Line {e.lineno}: {e.msg}" + (f"\n    {e.text.rstrip()}" if e.text else "")})
+        emit(
+            {
+                "type": "compile_error",
+                "error": f"Line {e.lineno}: {e.msg}" + (f"\n    {e.text.rstrip()}" if e.text else ""),
+            }
+        )
         return
     load_out = CappedIO(MAX_STDOUT)
     sys.stdout = sys.stderr = load_out
@@ -400,9 +455,14 @@ def main():
         exec(compiled, ns)
         signal.setitimer(signal.ITIMER_REAL, 0)
     except TimeLimitExceeded:
-        emit({"type": "compile_error", "error": "Time limit exceeded while loading your code (check for top-level loops)."})
+        emit(
+            {
+                "type": "compile_error",
+                "error": "Time limit exceeded while loading your code (check for top-level loops).",
+            }
+        )
         return
-    except BaseException as e:  # noqa: BLE001 — anything the user raises at import time
+    except BaseException as e:  # anything the user raises at import time
         signal.setitimer(signal.ITIMER_REAL, 0)
         emit({"type": "compile_error", "error": user_traceback(e)})
         return
@@ -412,12 +472,22 @@ def main():
     if kind == "design":
         target = ns.get(entry)
         if not isinstance(target, type):
-            emit({"type": "compile_error", "error": f"Couldn't find class {entry}. Keep the class name from the starter code."})
+            emit(
+                {
+                    "type": "compile_error",
+                    "error": f"Couldn't find class {entry}. Keep the class name from the starter code.",
+                }
+            )
             return
     else:
         sol_cls = ns.get("Solution")
         if not isinstance(sol_cls, type) or not callable(getattr(sol_cls, entry, None)):
-            emit({"type": "compile_error", "error": f"Couldn't find Solution.{entry}. Keep the class and method names from the starter code."})
+            emit(
+                {
+                    "type": "compile_error",
+                    "error": f"Couldn't find Solution.{entry}. Keep the class and method names from the starter code.",
+                }
+            )
             return
 
     emit({"type": "ready"})
@@ -434,7 +504,7 @@ def main():
                 ops, op_args = spec["ops"], spec["args"]
                 obj = target(*op_args[0])
                 value = [None]
-                for op, a in zip(ops[1:], op_args[1:]):
+                for op, a in zip(ops[1:], op_args[1:], strict=False):
                     value.append(getattr(obj, op)(*a))
             else:
                 args = convert_args(raw, param_types)
@@ -457,7 +527,7 @@ def main():
         except RecursionError as e:
             signal.setitimer(signal.ITIMER_REAL, 0)
             result.update(ok=False, error_type="runtime", error=user_traceback(e))
-        except BaseException as e:  # noqa: BLE001
+        except BaseException as e:
             signal.setitimer(signal.ITIMER_REAL, 0)
             result.update(ok=False, error_type="runtime", error=user_traceback(e))
         finally:

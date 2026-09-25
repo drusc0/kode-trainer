@@ -1,12 +1,12 @@
 # Backend tooling
 
-**Status:** adopted 2026-09-25 · **Scope:** `backend/` (the FastAPI service)
+**Status:** adopted 2026-09-25 · **Scope:** `backend/` (the FastAPI service); ruff also covers `runner/` and `scripts/`
 
 | Job | Tool | Command |
 |---|---|---|
 | Python, venv, dependencies, lockfile | [uv](https://docs.astral.sh/uv/) | `uv sync` · `uv add <pkg>` · `uv add --dev <pkg>` |
-| Lint + import sorting | [ruff](https://docs.astral.sh/ruff/) | `uv run ruff check .` (`--fix` to autofix) |
-| Formatting | ruff | `uv run ruff format .` |
+| Lint + import sorting | [ruff](https://docs.astral.sh/ruff/) | `uv run ruff check ..` (`--fix` to autofix) |
+| Formatting | ruff | `uv run ruff format ..` |
 | Type checking | [mypy](https://mypy.readthedocs.io/) `--strict` | `uv run mypy` |
 | Tests | [pytest](https://docs.pytest.org/) | `uv run pytest` |
 
@@ -38,6 +38,8 @@ From the repo root, `make lint` and `make test` run all of these (plus the front
   - **`RUF001` (ambiguous unicode)** is off because problem statements intentionally use `×`, `≤` and `–`.
   - **`W293` in `app/catalog/*`** is off because design-problem starter code keeps indented blank lines, so the editor cursor lands inside each method.
 - Line length is 120, matching the existing code's density and the frontend's Biome setting.
+- The config lives in the repo-root `ruff.toml`, so one ruleset covers the API, the runner and the scripts. The dev tools are installed in the backend's venv, which is why commands run from `backend/` (or via `uv run --project backend` from the root).
+- `src = ["backend", "runner"]` tells import sorting that `app` and the runner modules are first-party. `*.md` is excluded because ruff would otherwise reformat the code samples in the pattern guides.
 
 ### mypy `--strict`, not pyright or ty
 - It's the house standard (see the root `CLAUDE.md`) and the reference implementation of Python typing. It also works well with the Pydantic models FastAPI relies on.
@@ -55,5 +57,6 @@ From the repo root, `make lint` and `make test` run all of these (plus the front
 
 ## Consequences and follow-ups
 - The first `ruff format` rewrote some problem `gen` lambdas. Their source is part of `problem_fingerprint`, so the API reseeds those problems once on its next start (about 10–20 s, automatic).
-- `runner/` and `scripts/` aren't covered yet. The runner is stdlib-only and security-critical, and its harness deliberately uses `from x import *` to give user code LeetCode's implicit imports, so it needs its own ruff config. Worth doing as a separate change.
+- `runner/` and `scripts/` are linted and formatted but **not type-checked**. Strict mypy reports about 90 errors there, almost all missing annotations. The harness's star-imports live inside the `PRELUDE` string that's executed for user code, so they don't trip ruff.
+- In the runner, `zip()` over user-influenced lengths (argument lists, design ops) is explicitly `strict=False` to keep the existing behavior. Where lengths are already checked, it's `strict=True`. `make test-sandbox` passed after the change.
 - pytest shows a Starlette deprecation warning about `httpx` in `TestClient`. It comes from the framework and needs no action until FastAPI or Starlette change their testing extra.

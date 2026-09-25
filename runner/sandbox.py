@@ -1,4 +1,6 @@
 """Spawns the harness in a locked-down child process and collects its results."""
+
+import contextlib
 import json
 import os
 import resource
@@ -44,6 +46,7 @@ def _preexec(uid: int, cpu_s: int, lim: Limits):
             os.setgroups([])
             os.setgid(uid)
             os.setuid(uid)
+
     return fn
 
 
@@ -72,8 +75,13 @@ def run_job(job: dict, slot: int, lim: Limits = LIMITS) -> dict:
     started = time.monotonic()
     proc = subprocess.Popen(
         [lim.python, "-I", "-B", HARNESS],
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        cwd=lim.workdir, env=env, close_fds=True, preexec_fn=_preexec(uid, cpu, lim),
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=lim.workdir,
+        env=env,
+        close_fds=True,
+        preexec_fn=_preexec(uid, cpu, lim),
     )
     try:
         proc.stdin.write(payload)
@@ -111,14 +119,10 @@ def run_job(job: dict, slot: int, lim: Limits = LIMITS) -> dict:
     sel.close()
 
     if killed_reason or proc.poll() is None:
-        try:
+        with contextlib.suppress(ProcessLookupError):
             os.killpg(proc.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-    try:
+    with contextlib.suppress(subprocess.TimeoutExpired):
         proc.wait(timeout=2)
-    except subprocess.TimeoutExpired:
-        pass
     if lim.drop_privileges:
         _kill_uid(uid)
 
@@ -152,8 +156,12 @@ def run_job(job: dict, slot: int, lim: Limits = LIMITS) -> dict:
                     status, error = "crashed", f"Process was killed by {sig}{hint}"
             else:
                 status, error = "crashed", f"Process exited unexpectedly (code {rc})"
-    return {"status": status, "error": error, "results": results,
-            "elapsed_ms": round((time.monotonic() - started) * 1000)}
+    return {
+        "status": status,
+        "error": error,
+        "results": results,
+        "elapsed_ms": round((time.monotonic() - started) * 1000),
+    }
 
 
 if __name__ == "__main__":  # manual test: python sandbox.py < job.json

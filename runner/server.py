@@ -1,4 +1,5 @@
 """Tiny stdlib HTTP front for the sandbox. Only the API talks to it (internal network + shared token)."""
+
 import hmac
 import json
 import os
@@ -62,5 +63,8 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     if not TOKEN:
         raise SystemExit("RUNNER_TOKEN must be set")
-    print(f"runner listening on :8080 with {SLOTS} slots (drop_privileges={LIMITS.drop_privileges}, seccomp_required={LIMITS.seccomp_required})", flush=True)
+    print(
+        f"runner listening on :8080 with {SLOTS} slots (drop_privileges={LIMITS.drop_privileges}, seccomp_required={LIMITS.seccomp_required})",
+        flush=True,
+    )
     ThreadingHTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
