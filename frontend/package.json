@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "vitest run"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
@@ -18,10 +21,15 @@
     "remark-gfm": "^4.0.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@testing-library/react": "^16.3.3",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^30.1.1",
     "typescript": "~5.6.3",
-    "vite": "^5.4.11"
-  }
+    "vite": "^5.4.11",
+    "vitest": "^3.2.7"
+  },
+  "packageManager": "pnpm@12.6.0+sha512.3ef68f951cb111ac204b4a5a16f0b2ddf0da56a96e0413e81d855d9f0b55ef926714709028e1cd00c405c2c5fb7b9e8ec4dc46777c805d0373c2f2ff00fd20ec"
 }

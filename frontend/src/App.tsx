@@ -17,7 +17,9 @@ export default function App() {
       <header className="topbar">
         <NavLink to="/problems" className="brand">
           <span className="brand-mark" aria-hidden="true">
-            <i className="c pass" /><i className="c pass" /><i className="c fail" />
+            <i className="c pass" />
+            <i className="c pass" />
+            <i className="c fail" />
           </span>
           Kode<b>Train</b>
         </NavLink>
@@ -46,7 +48,7 @@ export default function App() {
             </select>
           </label>
         )}
-        <button className="icon-btn" onClick={toggleTheme} aria-label="Toggle dark mode">
+        <button type="button" className="icon-btn" onClick={toggleTheme} aria-label="Toggle dark mode">
           {theme === "dark" ? "☀" : "☾"}
         </button>
       </header>
@@ -55,11 +57,15 @@ export default function App() {
         <main className="page">
           <div className="notice fail">
             <b>Can't reach the KodeTrain API.</b> {error}
-            <p className="muted">Is the backend running? Try <code>make up</code>, then reload.</p>
+            <p className="muted">
+              Is the backend running? Try <code>make up</code>, then reload.
+            </p>
           </div>
         </main>
       ) : loading || !current ? (
-        <main className="page"><p className="muted">Loading…</p></main>
+        <main className="page">
+          <p className="muted">Loading…</p>
+        </main>
       ) : (
         <Routes>
           <Route path="/" element={<Navigate to="/problems" replace />} />
@@ -68,7 +74,14 @@ export default function App() {
           <Route path="/patterns" element={<PatternsPage />} />
           <Route path="/patterns/:slug" element={<PatternPage />} />
           <Route path="/sessions" element={<SessionsPage />} />
-          <Route path="*" element={<main className="page"><h1>Not found</h1></main>} />
+          <Route
+            path="*"
+            element={
+              <main className="page">
+                <h1>Not found</h1>
+              </main>
+            }
+          />
         </Routes>
       )}
     </ThemeContext.Provider>

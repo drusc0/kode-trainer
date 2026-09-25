@@ -12,7 +12,10 @@ export default function PatternsPage() {
   const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
-    api.problems(current?.id).then((r) => setProblems(r.problems)).catch(() => setProblems([]));
+    api
+      .problems(current?.id)
+      .then((r) => setProblems(r.problems))
+      .catch(() => setProblems([]));
   }, [current?.id]);
 
   return (
@@ -22,21 +25,33 @@ export default function PatternsPage() {
           <p className="eyebrow">Learn</p>
           <h1>Coding interview patterns</h1>
           <p className="lede">
-            Most interview questions are variations on about fifteen patterns. Learn to spot the signals, keep a Python template
-            in your head, then practise the linked problems until the pattern is automatic.
+            Most interview questions are variations on about fifteen patterns. Learn to spot the signals, keep a Python
+            template in your head, then practise the linked problems until the pattern is automatic.
           </p>
         </div>
       </div>
 
       <section className="guide">
-        <button className="guide-toggle" onClick={() => setShowGuide((v) => !v)} aria-expanded={showGuide}>
+        <button
+          type="button"
+          className="guide-toggle"
+          onClick={() => setShowGuide((v) => !v)}
+          aria-expanded={showGuide}
+        >
           <span>
             <b>How to approach any interview problem</b>
-            <span className="muted"> — clarify, brute force, optimise, code, verify, plus a complexity cheat sheet</span>
+            <span className="muted">
+              {" "}
+              — clarify, brute force, optimise, code, verify, plus a complexity cheat sheet
+            </span>
           </span>
           <span>{showGuide ? "−" : "+"}</span>
         </button>
-        {showGuide && <div className="guide-body"><Markdown>{APPROACH_GUIDE}</Markdown></div>}
+        {showGuide && (
+          <div className="guide-body">
+            <Markdown>{APPROACH_GUIDE}</Markdown>
+          </div>
+        )}
       </section>
 
       <div className="pattern-grid">
@@ -48,8 +63,14 @@ export default function PatternsPage() {
               <span className="num mono">{String(i + 1).padStart(2, "0")}</span>
               <h3>{p.title}</h3>
               <p>{p.summary}</p>
-              <p className="signals"><b>Signals:</b> {p.signals.join(" · ")}</p>
-              <Progress value={solved} total={list.length} label={`${list.length} practice problem${list.length === 1 ? "" : "s"}`} />
+              <p className="signals">
+                <b>Signals:</b> {p.signals.join(" · ")}
+              </p>
+              <Progress
+                value={solved}
+                total={list.length}
+                label={`${list.length} practice problem${list.length === 1 ? "" : "s"}`}
+              />
             </Link>
           );
         })}

@@ -85,7 +85,14 @@ export interface SessionStats {
   by_pattern: Record<string, Bucket>;
   submissions: number;
   accepted: number;
-  recent: { id: string; problem: string; title: string; verdict: string; created_at: string; runtime_ms: number | null }[];
+  recent: {
+    id: string;
+    problem: string;
+    title: string;
+    verdict: string;
+    created_at: string;
+    runtime_ms: number | null;
+  }[];
 }
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
@@ -107,7 +114,8 @@ const q = (sessionId?: string | null) => (sessionId ? `?session_id=${encodeURICo
 const sp = (sessionId: string, slug: string) => `/sessions/${sessionId}/problems/${slug}`;
 
 export const api = {
-  problems: (sessionId?: string | null) => req<{ patterns: string[]; problems: ProblemSummary[] }>(`/problems${q(sessionId)}`),
+  problems: (sessionId?: string | null) =>
+    req<{ patterns: string[]; problems: ProblemSummary[] }>(`/problems${q(sessionId)}`),
   problem: (slug: string, sessionId?: string | null) => req<ProblemDetail>(`/problems/${slug}${q(sessionId)}`),
 
   sessions: () => req<Session[]>("/sessions"),
