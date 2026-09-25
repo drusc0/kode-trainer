@@ -14,6 +14,7 @@ import {
 import Markdown from "../components/Markdown";
 import { DifficultyTag, ResultStrip, StatusMark, verdictTone } from "../components/ui";
 import { patternTitle } from "../content/patterns";
+import "../monaco";
 import { useSession, useThemeValue } from "../session";
 
 type Outcome =

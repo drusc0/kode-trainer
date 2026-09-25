@@ -1,11 +1,20 @@
+import { lazy, Suspense } from "react";
 import { Navigate, NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { TARGET_LABEL } from "./api";
 import PatternPage from "./pages/PatternPage";
 import PatternsPage from "./pages/PatternsPage";
 import ProblemsPage from "./pages/ProblemsPage";
 import SessionsPage from "./pages/SessionsPage";
-import WorkspacePage from "./pages/WorkspacePage";
 import { ThemeContext, useSession, useTheme } from "./session";
+
+// Monaco (~2.3 MB) is only needed on the workspace, so keep it out of the entry chunk.
+const WorkspacePage = lazy(() => import("./pages/WorkspacePage"));
+
+const loadingPage = (
+  <main className="page">
+    <p className="muted">Loading…</p>
+  </main>
+);
 
 export default function App() {
   const [theme, toggleTheme] = useTheme();
@@ -63,26 +72,26 @@ export default function App() {
           </div>
         </main>
       ) : loading || !current ? (
-        <main className="page">
-          <p className="muted">Loading…</p>
-        </main>
+        loadingPage
       ) : (
-        <Routes>
-          <Route path="/" element={<Navigate to="/problems" replace />} />
-          <Route path="/problems" element={<ProblemsPage />} />
-          <Route path="/problems/:slug" element={<WorkspacePage key={current.id} />} />
-          <Route path="/patterns" element={<PatternsPage />} />
-          <Route path="/patterns/:slug" element={<PatternPage />} />
-          <Route path="/sessions" element={<SessionsPage />} />
-          <Route
-            path="*"
-            element={
-              <main className="page">
-                <h1>Not found</h1>
-              </main>
-            }
-          />
-        </Routes>
+        <Suspense fallback={loadingPage}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/problems" replace />} />
+            <Route path="/problems" element={<ProblemsPage />} />
+            <Route path="/problems/:slug" element={<WorkspacePage key={current.id} />} />
+            <Route path="/patterns" element={<PatternsPage />} />
+            <Route path="/patterns/:slug" element={<PatternPage />} />
+            <Route path="/sessions" element={<SessionsPage />} />
+            <Route
+              path="*"
+              element={
+                <main className="page">
+                  <h1>Not found</h1>
+                </main>
+              }
+            />
+          </Routes>
+        </Suspense>
       )}
     </ThemeContext.Provider>
   );

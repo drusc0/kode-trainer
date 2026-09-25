@@ -52,4 +52,4 @@ Rejected alternatives:
 ## Consequences and follow-ups
 - The Docker build now runs `node:24-alpine` (Node 20 reached end-of-life in April 2026) and `pnpm install --frozen-lockfile`. A new `.dockerignore` stops the host's `node_modules` (macOS binaries) from being copied over the container's.
 - The first `biome format` reformatted most files, `styles.css` especially. That's a one-time diff.
-- Vite warns about the Monaco chunk size (more than 500 kB). That predates this change. Code-splitting the editor route would address it.
+- Monaco is code-split: `WorkspacePage` is lazy-loaded in `App.tsx` and imports `monaco.ts` itself, so only `/problems/:slug` downloads the editor chunk. Keep `monaco.ts` out of eagerly loaded modules, or it lands back in the entry chunk.
