@@ -1,5 +1,6 @@
 """Problem catalog. Problems are code (trusted); hidden tests are generated deterministically and
 their expected outputs are computed by running the reference solution in the sandbox at seed time."""
+
 import hashlib
 import inspect
 import json
@@ -9,10 +10,24 @@ from .problems_arrays import PROBLEMS as _A
 from .problems_structures import PROBLEMS as _B
 
 PATTERNS = [
-    "arrays-hashing", "two-pointers", "sliding-window", "prefix-sum", "stack", "binary-search",
-    "linked-list", "trees", "heap", "graphs", "backtracking", "dynamic-programming",
-    "intervals-greedy", "design", "trie",
+    "arrays-hashing",
+    "two-pointers",
+    "sliding-window",
+    "prefix-sum",
+    "stack",
+    "binary-search",
+    "linked-list",
+    "trees",
+    "heap",
+    "graphs",
+    "backtracking",
+    "dynamic-programming",
+    "intervals-greedy",
+    "design",
+    "trie",
 ]
+__all__ = ["BY_SLUG", "PATTERNS", "PROBLEMS", "Problem", "problem_fingerprint"]
+
 _DIFF = {"Easy": 0, "Medium": 1, "Hard": 2}
 
 PROBLEMS: list[Problem] = sorted(_A + _B, key=lambda p: (PATTERNS.index(p.pattern), _DIFF[p.difficulty], p.title))
@@ -26,9 +41,19 @@ for _p in PROBLEMS:
 
 def problem_fingerprint(p: Problem) -> str:
     """Changes whenever the reference, generator, examples, limits or compare mode change -> triggers reseed."""
-    blob = json.dumps({
-        "ref": p.reference, "gen": inspect.getsource(p.gen) if callable(p.gen) else "",
-        "ex": p.examples, "cmp": p.compare, "kind": p.kind, "params": p.params, "ret": p.returns,
-        "tl": p.time_limit_ms, "v": p.seed_version,
-    }, sort_keys=True, default=str)
+    blob = json.dumps(
+        {
+            "ref": p.reference,
+            "gen": inspect.getsource(p.gen) if callable(p.gen) else "",
+            "ex": p.examples,
+            "cmp": p.compare,
+            "kind": p.kind,
+            "params": p.params,
+            "ret": p.returns,
+            "tl": p.time_limit_ms,
+            "v": p.seed_version,
+        },
+        sort_keys=True,
+        default=str,
+    )
     return hashlib.sha256(blob.encode()).hexdigest()[:16]

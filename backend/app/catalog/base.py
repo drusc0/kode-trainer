@@ -2,32 +2,33 @@ from __future__ import annotations
 
 import random
 from collections import deque
-from dataclasses import dataclass, field
-from typing import Callable, Optional
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
 class Problem:
     slug: str
     title: str
-    difficulty: str                      # Easy | Medium | Hard
-    pattern: str                         # slug of a pattern guide page
+    difficulty: str  # Easy | Medium | Hard
+    pattern: str  # slug of a pattern guide page
     topics: list[str]
-    companies: list[str]                 # google | meta
-    statement: str                       # markdown
-    entry: str                           # method name (function) or class name (design)
-    params: list[tuple[str, str]]        # (name, python type); "TreeNode@0" = node of arg 0 by value
+    companies: list[str]  # google | meta
+    statement: str  # markdown
+    entry: str  # method name (function) or class name (design)
+    params: list[tuple[str, str]]  # (name, python type); "TreeNode@0" = node of arg 0 by value
     returns: str
-    examples: list[dict]                 # {"args": [...], "note": "..."}
+    examples: list[dict[str, Any]]  # {"args": [...], "note": "..."}
     constraints: list[str]
     hints: list[str]
-    reference: str                       # trusted Python solution, run in the sandbox to compute expected outputs
-    gen: Callable[[random.Random], list]
+    reference: str  # trusted Python solution, run in the sandbox to compute expected outputs
+    gen: Callable[[random.Random], list[Any]]
     compare: str = "exact"
-    kind: str = "function"               # function | design
+    kind: str = "function"  # function | design
     time_limit_ms: int = 2000
-    starter: Optional[str] = None        # required for design problems
-    seed_version: int = 1                # bump to regenerate this problem's hidden tests
+    starter: str | None = None  # required for design problems
+    seed_version: int = 1  # bump to regenerate this problem's hidden tests
 
     def display_type(self, t: str) -> str:
         return "TreeNode" if t.startswith("TreeNode@") else t
@@ -39,11 +40,15 @@ class Problem:
         pre = ""
         types = " ".join(t for _, t in self.params) + " " + self.returns
         if "ListNode" in types:
-            pre += ("# Definition for singly-linked list.\n# class ListNode:\n#     def __init__(self, val=0, next=None):\n"
-                    "#         self.val = val\n#         self.next = next\n")
+            pre += (
+                "# Definition for singly-linked list.\n# class ListNode:\n#     def __init__(self, val=0, next=None):\n"
+                "#         self.val = val\n#         self.next = next\n"
+            )
         if "TreeNode" in types:
-            pre += ("# Definition for a binary tree node.\n# class TreeNode:\n#     def __init__(self, val=0, left=None, right=None):\n"
-                    "#         self.val = val\n#         self.left = left\n#         self.right = right\n")
+            pre += (
+                "# Definition for a binary tree node.\n# class TreeNode:\n#     def __init__(self, val=0, left=None, right=None):\n"
+                "#         self.val = val\n#         self.left = left\n#         self.right = right\n"
+            )
         return f"{pre}class Solution:\n    def {self.entry}(self, {sig}) -> {self.returns}:\n        \n"
 
     def param_types(self) -> list[str]:
@@ -63,11 +68,11 @@ def word(r: random.Random, n: int, alpha: str) -> str:
     return "".join(r.choice(alpha) for _ in range(n))
 
 
-def random_tree(r: random.Random, values: list) -> list:
+def random_tree(r: random.Random, values: list[int]) -> list[int | None]:
     """Random binary tree shape filled with `values` in insertion order, as a LeetCode level-order list."""
     if not values:
         return []
-    nodes = [{"v": values[0], "l": None, "r": None}]
+    nodes: list[dict[str, Any]] = [{"v": values[0], "l": None, "r": None}]
     for v in values[1:]:
         while True:
             parent = r.choice(nodes)
@@ -80,16 +85,16 @@ def random_tree(r: random.Random, values: list) -> list:
     return level_order(nodes[0])
 
 
-def random_bst(r: random.Random, n: int, lo: int, hi: int) -> list:
+def random_bst(r: random.Random, n: int, lo: int, hi: int) -> list[int | None]:
     """Random shape, values assigned in-order so it is a valid BST."""
     vals = sorted(r.sample(range(lo, hi + 1), n))
     shape = {"n": 0}
 
-    def build(k):
+    def build(k: int) -> dict[str, Any] | None:
         if k == 0:
             return None
         left = r.randint(0, k - 1)
-        node = {"l": build(left)}
+        node: dict[str, Any] = {"l": build(left)}
         node["v"] = vals[shape["n"]]
         shape["n"] += 1
         node["r"] = build(k - 1 - left)
@@ -98,10 +103,11 @@ def random_bst(r: random.Random, n: int, lo: int, hi: int) -> list:
     return level_order(build(n)) if n else []
 
 
-def level_order(root) -> list:
+def level_order(root: dict[str, Any] | None) -> list[int | None]:
     if root is None:
         return []
-    out, q = [], deque([root])
+    out: list[int | None] = []
+    q = deque([root])
     while q:
         node = q.popleft()
         if node is None:
