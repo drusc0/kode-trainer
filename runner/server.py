@@ -5,6 +5,7 @@ import json
 import os
 import queue
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any
 
 from sandbox import LIMITS, run_job
 
@@ -20,7 +21,7 @@ for s in range(SLOTS):
 class Handler(BaseHTTPRequestHandler):
     server_version = "kodetrain-runner"
 
-    def _send(self, code, obj):
+    def _send(self, code: int, obj: Any) -> None:
         body = json.dumps(obj).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
@@ -28,36 +29,41 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def do_GET(self):
+    def do_GET(self) -> None:
         if self.path == "/health":
             self._send(200, {"ok": True, "slots": SLOTS, "free": free_slots.qsize()})
         else:
             self._send(404, {"error": "not found"})
 
-    def do_POST(self):
+    def do_POST(self) -> None:
         if self.path != "/run":
-            return self._send(404, {"error": "not found"})
+            self._send(404, {"error": "not found"})
+            return
         if not TOKEN or not hmac.compare_digest(self.headers.get("X-Runner-Token", ""), TOKEN):
-            return self._send(401, {"error": "unauthorized"})
+            self._send(401, {"error": "unauthorized"})
+            return
         length = int(self.headers.get("Content-Length", "0"))
         if length <= 0 or length > MAX_BODY:
-            return self._send(413, {"error": "payload too large"})
+            self._send(413, {"error": "payload too large"})
+            return
         try:
             job = json.loads(self.rfile.read(length))
             assert isinstance(job.get("code"), str) and isinstance(job.get("tests"), list) and job.get("entry")
         except Exception:
-            return self._send(400, {"error": "bad job"})
+            self._send(400, {"error": "bad job"})
+            return
         try:
             slot = free_slots.get(timeout=30)
         except queue.Empty:
-            return self._send(503, {"error": "all sandboxes busy, try again"})
+            self._send(503, {"error": "all sandboxes busy, try again"})
+            return
         try:
             self._send(200, run_job(job, slot))
         finally:
             free_slots.put(slot)
 
-    def log_message(self, fmt, *args):  # keep logs short
-        print("runner:", fmt % args, flush=True)
+    def log_message(self, format: str, *args: Any) -> None:  # keep logs short
+        print("runner:", format % args, flush=True)
 
 
 if __name__ == "__main__":

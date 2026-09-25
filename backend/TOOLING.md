@@ -57,6 +57,7 @@ From the repo root, `make lint` and `make test` run all of these (plus the front
 
 ## Consequences and follow-ups
 - The first `ruff format` rewrote some problem `gen` lambdas. Their source is part of `problem_fingerprint`, so the API reseeds those problems once on its next start (about 10–20 s, automatic).
-- `runner/` and `scripts/` are linted and formatted but **not type-checked**. Strict mypy reports about 90 errors there, almost all missing annotations. The harness's star-imports live inside the `PRELUDE` string that's executed for user code, so they don't trip ruff.
+- `runner/` is type-checked with the same strict settings, as Linux (`mypy --platform linux ../runner`), because it only runs in its Linux container and uses Linux-only process and seccomp APIs. It has no third-party dependencies, so the backend's venv can check it. Untrusted user values and JSON payloads are typed as `Any`, which keeps the checks focused on the runner's own logic. The harness's star-imports live inside the `PRELUDE` string that's executed for user code, so they don't trip ruff.
+- `scripts/validate_catalog.py` is linted but not type-checked. It's a small test driver that imports both the runner and the backend by path.
 - In the runner, `zip()` over user-influenced lengths (argument lists, design ops) is explicitly `strict=False` to keep the existing behavior. Where lengths are already checked, it's `strict=True`. `make test-sandbox` passed after the change.
 - pytest shows a Starlette deprecation warning about `httpx` in `TestClient`. It comes from the framework and needs no action until FastAPI or Starlette change their testing extra.

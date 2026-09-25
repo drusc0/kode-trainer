@@ -15,9 +15,9 @@ logs:
 dev-web:       ## hot-reload frontend on :5173 against the dockerized API
 	cd frontend && $(PNPM) install && $(PNPM) dev
 
-lint:          ## ruff for all Python (api, runner, scripts) + mypy for the API, Biome for the web app
+lint:          ## ruff for all Python, mypy for the API and runner, Biome for the web app
 	uv run --project backend ruff check . && uv run --project backend ruff format --check .
-	cd backend && uv run mypy
+	cd backend && uv run mypy && uv run mypy --platform linux ../runner
 	cd frontend && $(PNPM) install --frozen-lockfile && $(PNPM) lint && $(PNPM) exec tsc --noEmit
 
 format:        ## auto-fix formatting and safe lint fixes on both sides
