@@ -11,6 +11,7 @@ export type SubmitResult = Schemas["SubmitResult"];
 export type Submission = Schemas["Submission"];
 export type Bucket = Schemas["Bucket"];
 export type SessionStats = Schemas["SessionStats"];
+export type ChatMessage = Schemas["ChatMessage"];
 export type Difficulty = ProblemSummary["difficulty"];
 export type Target = Session["target"];
 export type Status = ProblemSummary["status"];
@@ -53,6 +54,12 @@ export const api = {
   submit: (sessionId: string, slug: string, code: string) =>
     req<SubmitResult>(`${sp(sessionId, slug)}/submit`, { method: "POST", body: JSON.stringify({ code }) }),
   submissions: (sessionId: string, slug: string) => req<Submission[]>(`${sp(sessionId, slug)}/submissions`),
+  chat: (sessionId: string, slug: string) => req<Schemas["ChatHistory"]>(`${sp(sessionId, slug)}/chat`),
+  sendChat: (sessionId: string, slug: string, message: string, code: string) =>
+    req<Schemas["ChatReply"]>(`${sp(sessionId, slug)}/chat`, {
+      method: "POST", body: JSON.stringify({ message, code } satisfies Schemas["ChatIn"]),
+    }),
+  clearChat: (sessionId: string, slug: string) => req<void>(`${sp(sessionId, slug)}/chat`, { method: "DELETE" }),
 };
 
 export function timeAgo(iso: string | null): string {

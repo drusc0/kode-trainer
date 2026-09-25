@@ -5,6 +5,7 @@ import {
   api, TARGET_LABEL, timeAgo,
   type CaseResult, type ProblemDetail, type RunResult, type Submission, type SubmitResult,
 } from "../api";
+import ChatPanel from "../components/ChatPanel";
 import Markdown from "../components/Markdown";
 import { DifficultyTag, ResultStrip, StatusMark, verdictTone } from "../components/ui";
 import { patternTitle } from "../content/patterns";
@@ -30,7 +31,7 @@ export default function WorkspacePage() {
   const [cases, setCases] = useState<string[][]>([]);
   const [activeCase, setActiveCase] = useState(0);
   const [consoleTab, setConsoleTab] = useState<"cases" | "result">("cases");
-  const [leftTab, setLeftTab] = useState<"description" | "submissions">("description");
+  const [leftTab, setLeftTab] = useState<"description" | "submissions" | "chat">("description");
   const [busy, setBusy] = useState<"run" | "submit" | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [submissions, setSubmissions] = useState<Submission[] | null>(null);
@@ -164,6 +165,7 @@ export default function WorkspacePage() {
         <div className="tabs">
           <button className={leftTab === "description" ? "on" : ""} onClick={() => setLeftTab("description")}>Description</button>
           <button className={leftTab === "submissions" ? "on" : ""} onClick={() => setLeftTab("submissions")}>Submissions</button>
+          <button className={leftTab === "chat" ? "on" : ""} onClick={() => setLeftTab("chat")}>Chat</button>
           <div className="grow" />
           <Link to="/problems" className="back">← All problems</Link>
         </div>
@@ -193,8 +195,10 @@ export default function WorkspacePage() {
                 <details key={i} className="hint"><summary>Hint {i + 1}</summary><p>{h}</p></details>
               ))}
             </article>
-          ) : (
+          ) : leftTab === "submissions" ? (
             <SubmissionsList subs={submissions} onLoad={(c) => setCode(c)} />
+          ) : (
+            <ChatPanel key={slug} sessionId={sessionId} slug={slug} code={code} />
           )}
         </div>
       </section>
