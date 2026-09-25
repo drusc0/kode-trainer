@@ -4,12 +4,16 @@ from typing import Any, cast
 
 import pytest
 from anthropic import AsyncAnthropic
+from fastapi.testclient import TestClient
 
 from app import chat
 from app.catalog import BY_SLUG
+from app.core import settings
+from app.main import app
 from app.schemas import ChatMessage, Example
 
 TWO_SUM = BY_SLUG["two-sum"]
+CHAT_URL = "/api/sessions/000000000000000000000000/problems/two-sum/chat"
 EXAMPLES = [
     Example(args=["[2, 7, 11, 15]", "9"], output="[0, 1]", note="nums[0] + nums[1] = 9."),
     Example(args=["[3, 2, 4]", "6"], output="[1, 2]"),
@@ -79,3 +83,16 @@ def test_reply_refusal_raises_chat_error() -> None:
     client, _ = fake_client("", stop_reason="refusal")
     with pytest.raises(chat.ChatError):
         asyncio.run(chat.reply(client, "m", "S", [], "x"))
+
+
+def test_chat_without_key_returns_503(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "anthropic_api_key", "")
+    resp = TestClient(app).post(CHAT_URL, json={"message": "hint?", "code": ""})
+    assert resp.status_code == 503
+    assert "ANTHROPIC_API_KEY" in resp.json()["detail"]
+
+
+def test_blank_message_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
+    resp = TestClient(app).post(CHAT_URL, json={"message": "   ", "code": ""})
+    assert resp.status_code == 422

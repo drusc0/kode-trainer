@@ -8,12 +8,12 @@ from bson.errors import InvalidId
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import judge
+from . import chat, judge
 from .catalog import PATTERNS, PROBLEMS, Problem
 from .core import RunnerError, db, ensure_indexes, now, settings
 from .schemas import (
-    CodeIn, Example, Health, ProblemDetail, ProblemList, RunIn, RunResult, Session, SessionIn, SessionPatch,
-    SessionStats, Submission, SubmitResult,
+    ChatHistory, ChatIn, ChatMessage, ChatReply, CodeIn, Example, Health, ProblemDetail, ProblemList, RunIn, RunResult,
+    Session, SessionIn, SessionPatch, SessionStats, Submission, SubmitResult,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -147,7 +147,7 @@ async def update_session(session_id: str, body: SessionPatch):
 @app.delete("/api/sessions/{session_id}", status_code=204)
 async def delete_session(session_id: str):
     s = await get_session(session_id)
-    for coll in ("submissions", "drafts", "progress"):
+    for coll in ("submissions", "drafts", "progress", "chats"):
         await db()[coll].delete_many({"session_id": session_id})
     await db().sessions.delete_one({"_id": s["_id"]})
 
@@ -238,3 +238,40 @@ async def list_submissions(session_id: str, slug: str, limit: int = Query(30, le
         out.append({"id": str(sub["_id"]), "verdict": sub["verdict"], "passed": sub["passed"], "total": sub["total"],
                     "runtime_ms": sub.get("runtime_ms"), "created_at": sub["created_at"], "code": sub["code"]})
     return out
+
+
+# ---------------------------------------------------------------- chat
+@app.get("/api/sessions/{session_id}/problems/{slug}/chat", response_model=ChatHistory)
+async def get_chat(session_id: str, slug: str):
+    await get_session(session_id)
+    get_problem(slug)
+    doc = await db().chats.find_one({"session_id": session_id, "problem": slug})
+    return {"messages": doc["messages"] if doc else []}
+
+
+@app.post("/api/sessions/{session_id}/problems/{slug}/chat", response_model=ChatReply)
+async def send_chat(session_id: str, slug: str, body: ChatIn):
+    if not settings.anthropic_api_key:
+        raise HTTPException(503, "Chat is not configured: set ANTHROPIC_API_KEY in .env")
+    await get_session(session_id)
+    p = get_problem(slug)
+    key = {"session_id": session_id, "problem": slug}
+    doc = await db().chats.find_one(key)
+    history = [ChatMessage(**m) for m in doc["messages"]] if doc else []
+    system = chat.build_system_prompt(p, await example_views(p))
+    try:
+        text = await chat.reply(chat.client(), settings.chat_model, system, history, chat.user_turn(body.message, body.code))
+    except chat.ChatError as e:
+        raise HTTPException(502, str(e))
+    answer = ChatMessage(role="assistant", content=text)
+    await db().chats.update_one(
+        key,
+        {"$push": {"messages": {"$each": [{"role": "user", "content": body.message}, answer.model_dump()]}},
+         "$set": {"updated_at": now()}},
+        upsert=True)
+    return {"message": answer}
+
+
+@app.delete("/api/sessions/{session_id}/problems/{slug}/chat", status_code=204)
+async def clear_chat(session_id: str, slug: str):
+    await db().chats.delete_one({"session_id": session_id, "problem": slug})

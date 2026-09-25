@@ -1,9 +1,9 @@
 """Request and response models: the API contract. The frontend's types are generated from these."""
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from .core import settings
 
@@ -171,3 +171,16 @@ class SessionStats(BaseModel):
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: str
+
+
+class ChatIn(BaseModel):
+    message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
+    code: str = Field(default="", max_length=settings.max_code_bytes)
+
+
+class ChatHistory(BaseModel):
+    messages: list[ChatMessage]
+
+
+class ChatReply(BaseModel):
+    message: ChatMessage

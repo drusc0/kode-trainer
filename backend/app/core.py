@@ -35,6 +35,7 @@ async def ensure_indexes() -> None:
     await d.submissions.create_index([("session_id", 1), ("created_at", -1)])
     await d.progress.create_index([("session_id", 1), ("problem", 1)], unique=True)
     await d.drafts.create_index([("session_id", 1), ("problem", 1)], unique=True)
+    await d.chats.create_index([("session_id", 1), ("problem", 1)], unique=True)
 
 
 def now() -> datetime:
