@@ -14,7 +14,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-DONE_MARKER = b'{"type": "done"}'
+# Anchored to its own line so a returned {"type": "done"} inside a result line can't end the job early.
+DONE_MARKER = b'\n{"type": "done"}\n'
 HARNESS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "harness.py")
 
 
@@ -65,7 +66,6 @@ def _kill_uid(uid: int) -> None:
             pass
 
 
-def run_job(job: dict[str, Any], slot: int, lim: Limits = LIMITS) -> dict[str, Any]:
 def _remove_files(uid: int) -> None:
     """Delete what a sandbox uid left in the shared writable dirs, so nothing carries over to later jobs."""
     for root in ("/tmp", "/dev/shm"):
@@ -80,6 +80,7 @@ def _remove_files(uid: int) -> None:
                         os.unlink(entry.path)
 
 
+def run_job(job: dict[str, Any], slot: int, lim: Limits = LIMITS) -> dict[str, Any]:
     uid = lim.base_uid + slot
     n = max(1, len(job.get("tests", [])))
     per_test = max(0.05, job.get("time_limit_ms", 2000) / 1000)
@@ -145,8 +146,8 @@ def _remove_files(uid: int) -> None:
         proc.wait(timeout=2)
     if lim.drop_privileges:
         _kill_uid(uid)
-
         _remove_files(uid)
+
     results: list[dict[str, Any]] = []
     status, got_done = "ok", False
     error: str | None = None
