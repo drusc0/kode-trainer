@@ -5,6 +5,7 @@ import json
 import os
 import resource
 import selectors
+import shutil
 import signal
 import subprocess
 import sys
@@ -65,6 +66,20 @@ def _kill_uid(uid: int) -> None:
 
 
 def run_job(job: dict[str, Any], slot: int, lim: Limits = LIMITS) -> dict[str, Any]:
+def _remove_files(uid: int) -> None:
+    """Delete what a sandbox uid left in the shared writable dirs, so nothing carries over to later jobs."""
+    for root in ("/tmp", "/dev/shm"):
+        with contextlib.suppress(FileNotFoundError):
+            for entry in os.scandir(root):
+                with contextlib.suppress(FileNotFoundError):
+                    if entry.stat(follow_symlinks=False).st_uid != uid:
+                        continue
+                    if entry.is_dir(follow_symlinks=False):
+                        shutil.rmtree(entry.path, ignore_errors=True)
+                    else:
+                        os.unlink(entry.path)
+
+
     uid = lim.base_uid + slot
     n = max(1, len(job.get("tests", [])))
     per_test = max(0.05, job.get("time_limit_ms", 2000) / 1000)
@@ -131,6 +146,7 @@ def run_job(job: dict[str, Any], slot: int, lim: Limits = LIMITS) -> dict[str, A
     if lim.drop_privileges:
         _kill_uid(uid)
 
+        _remove_files(uid)
     results: list[dict[str, Any]] = []
     status, got_done = "ok", False
     error: str | None = None

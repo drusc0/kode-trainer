@@ -86,7 +86,7 @@ User code is untrusted. The defences are layered so that no single failure expos
 3. **Per-job process isolation.** Each job runs in a fresh process under a **dedicated unprivileged uid per slot**, in its own session and process group. It gets a clean environment (`PATH`, `LANG`, `HOME` only — secrets aren't visible), `python -I` isolated mode, and a working directory it can't write to.
 4. **Resource limits (rlimits).** Address space 512 MB, CPU time, 1 MB max file size, 64 open files, 16 processes (stops fork bombs), no core dumps.
 5. **seccomp filter** installed by the harness before any user code runs. `socket`, `connect`, `execve`, `ptrace`, `mount`, `unshare`, `bpf`, `io_uring`, `setrlimit` and similar calls fail with `EPERM`.
-6. **Timeouts and cleanup.** A per-test time limit (SIGALRM), a wall-clock limit for the whole job, an output size cap, then `killpg` plus a sweep that kills every remaining process owned by the job's uid.
+6. **Timeouts and cleanup.** A per-test time limit (SIGALRM), a wall-clock limit for the whole job, an output size cap, then `killpg` plus a sweep that kills every remaining process owned by the job's uid and deletes any files it left in `/tmp` or `/dev/shm`.
 7. **Authenticated runner API.** Requests need the shared `RUNNER_TOKEN`.
 
 `make test-sandbox` checks this with hostile submissions: network access, subprocess/exec, infinite loops, memory bombs, fork bombs, writes to the code directory, and reading environment secrets.
