@@ -46,6 +46,7 @@ export default function WorkspacePage() {
   const [leftPct, setLeftPct] = useState(42);
   const [consolePct, setConsolePct] = useState(36);
   const lastSaved = useRef<string | null>(null);
+  const pendingDraft = useRef<{ slug: string; code: string } | null>(null);
 
   // ---------------------------------------------------------------- load
   useEffect(() => {
@@ -69,6 +70,10 @@ export default function WorkspacePage() {
       .catch((e: Error) => !cancelled && setLoadError(e.message));
     return () => {
       cancelled = true;
+      // leaving the problem: save edits still waiting on the autosave debounce
+      const draft = pendingDraft.current;
+      pendingDraft.current = null;
+      if (draft) api.saveDraft(sessionId, draft.slug, draft.code).catch(() => undefined);
     };
   }, [slug, sessionId]);
 
@@ -85,13 +90,20 @@ export default function WorkspacePage() {
 
   // ---------------------------------------------------------------- autosave draft (per session)
   useEffect(() => {
-    if (!problem || code === lastSaved.current) return;
+    if (!problem || problem.slug !== slug) return; // still showing the previous problem
+    if (code === lastSaved.current) {
+      pendingDraft.current = null;
+      return;
+    }
+    const draft = { slug, code };
+    pendingDraft.current = draft;
     setSaveState("saving");
     const t = setTimeout(() => {
+      pendingDraft.current = null;
       api
-        .saveDraft(sessionId, slug, code)
+        .saveDraft(sessionId, draft.slug, draft.code)
         .then(() => {
-          lastSaved.current = code;
+          lastSaved.current = draft.code;
           setSaveState("saved");
         })
         .catch(() => setSaveState("idle"));
