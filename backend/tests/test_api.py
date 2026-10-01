@@ -41,3 +41,7 @@ def test_create_session_validates_target() -> None:
 
 def test_unknown_host_is_rejected() -> None:
     assert TestClient(app, base_url="http://attacker.example").get("/api/problems").status_code == 400
+
+
+def test_submissions_limit_must_be_positive() -> None:
+    assert client.get(f"/api/sessions/{SESSION}/problems/two-sum/submissions?limit=0").status_code == 422

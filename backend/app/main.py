@@ -297,7 +297,7 @@ async def submit(session_id: str, slug: str, body: CodeIn) -> Doc:
 
 
 @app.get("/api/sessions/{session_id}/problems/{slug}/submissions", response_model=list[Submission])
-async def list_submissions(session_id: str, slug: str, limit: int = Query(30, le=100)) -> list[Doc]:
+async def list_submissions(session_id: str, slug: str, limit: int = Query(30, ge=1, le=100)) -> list[Doc]:
     await get_session(session_id)
     out = []
     async for sub in (
