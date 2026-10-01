@@ -88,6 +88,7 @@ User code is untrusted. The defences are layered so that no single failure expos
 5. **seccomp filter** installed by the harness before any user code runs. `socket`, `connect`, `execve`, `ptrace`, `mount`, `unshare`, `bpf`, `io_uring`, `setrlimit` and similar calls fail with `EPERM`.
 6. **Timeouts and cleanup.** A per-test time limit (SIGALRM), a wall-clock limit for the whole job, an output size cap, then `killpg` plus a sweep that kills every remaining process owned by the job's uid and deletes any files it left in `/tmp` or `/dev/shm`.
 7. **Authenticated runner API.** Requests need the shared `RUNNER_TOKEN`.
+8. **Host allowlist on the API.** It only answers to the hostnames in `ALLOWED_HOSTS` (default `localhost,127.0.0.1`), so a web page can't use DNS rebinding to reach your local instance.
 
 `make test-sandbox` checks this with hostile submissions: network access, subprocess/exec, infinite loops, memory bombs, fork bombs, writes to the code directory, and reading environment secrets.
 

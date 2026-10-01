@@ -18,6 +18,10 @@ class Settings:
     cors_origins: tuple[str, ...] = tuple(
         o for o in os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",") if o
     )
+    # The API has no auth, so only answer to known hostnames: blocks DNS-rebinding pages from driving it.
+    allowed_hosts: tuple[str, ...] = tuple(
+        h for h in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h
+    )
     max_code_bytes: int = 64 * 1024
     max_custom_cases: int = 10
     anthropic_api_key: str = os.environ.get("ANTHROPIC_API_KEY", "")

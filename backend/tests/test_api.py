@@ -6,7 +6,7 @@ from app.main import app
 
 # No `with` block: the lifespan (Mongo indexes + seeding) never runs, so only requests
 # rejected before touching the database are testable here.
-client = TestClient(app)
+client = TestClient(app, base_url="http://localhost")
 SESSION = "0123456789abcdef01234567"
 
 
@@ -37,3 +37,7 @@ def test_run_rejects_oversized_or_empty_input(body: dict[str, object]) -> None:
 
 def test_create_session_validates_target() -> None:
     assert client.post("/api/sessions", json={"name": "x", "target": "amazon"}).status_code == 422
+
+
+def test_unknown_host_is_rejected() -> None:
+    assert TestClient(app, base_url="http://attacker.example").get("/api/problems").status_code == 400

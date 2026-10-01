@@ -88,14 +88,14 @@ def test_reply_refusal_raises_chat_error() -> None:
 
 def test_chat_without_key_returns_503(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "anthropic_api_key", "")
-    resp = TestClient(app).post(CHAT_URL, json={"message": "hint?", "code": ""})
+    resp = TestClient(app, base_url="http://localhost").post(CHAT_URL, json={"message": "hint?", "code": ""})
     assert resp.status_code == 503
     assert "ANTHROPIC_API_KEY" in resp.json()["detail"]
 
 
 def test_blank_message_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
-    resp = TestClient(app).post(CHAT_URL, json={"message": "   ", "code": ""})
+    resp = TestClient(app, base_url="http://localhost").post(CHAT_URL, json={"message": "   ", "code": ""})
     assert resp.status_code == 422
 
 
