@@ -42,14 +42,24 @@ class Handler(BaseHTTPRequestHandler):
         if not TOKEN or not hmac.compare_digest(self.headers.get("X-Runner-Token", ""), TOKEN):
             self._send(401, {"error": "unauthorized"})
             return
-        length = int(self.headers.get("Content-Length", "0"))
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = 0
         if length <= 0 or length > MAX_BODY:
             self._send(413, {"error": "payload too large"})
             return
         try:
             job = json.loads(self.rfile.read(length))
-            assert isinstance(job.get("code"), str) and isinstance(job.get("tests"), list) and job.get("entry")
-        except Exception:
+        except ValueError:
+            job = None
+        if not (
+            isinstance(job, dict)
+            and isinstance(job.get("code"), str)
+            and isinstance(job.get("tests"), list)
+            and isinstance(job.get("entry"), str)
+            and isinstance(job.get("time_limit_ms", 0), int)
+        ):
             self._send(400, {"error": "bad job"})
             return
         try:
