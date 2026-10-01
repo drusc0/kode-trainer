@@ -95,7 +95,7 @@ User code is untrusted. The defences are layered so that no single failure expos
 **Known limits.**
 - The harness and your code share one Python process. A determined user could tamper with *their own* results, which only affects their own practice.
 - The container shares the host kernel. For stronger isolation on Linux, install [gVisor](https://gvisor.dev) and uncomment `runtime: runsc` in `docker-compose.yml`. This is recommended before exposing KodeTrain beyond your own machine.
-- There's no authentication yet. The ports bind to `127.0.0.1` only. Add auth before hosting it for other people.
+- There's no authentication yet. The ports bind to `127.0.0.1` only. To reach it from your other devices, put it behind something that does the login for you, such as [Tailscale](https://tailscale.com) or Cloudflare Access, rather than opening the ports. Everyone who can reach an instance shares its sessions.
 
 ## Adding a problem
 
@@ -135,3 +135,7 @@ cd frontend && corepack pnpm install && corepack pnpm dev
 Local tooling needs [uv](https://docs.astral.sh/uv/) and Node 24 (which ships `corepack`, so pnpm needs no separate install).
 
 Note that the unsafe runner flags remove the sandbox's main protections. Use them only with your own code.
+
+## License
+
+[MIT](LICENSE)
