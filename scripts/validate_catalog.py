@@ -71,5 +71,17 @@ for name, code in ATTACKS.items():
         f"  {'LEAK' if leaked else 'ok  '} {name:10s} -> {r['status']}: {(r['error'] or res.get('error') or str(res.get('output')))[:100]!r}"
     )
 
+# Sandbox state must not leak between jobs, and user output must not be mistaken for the done marker.
+writer = "class Solution:\n    def twoSum(self, n, t):\n        open('/tmp/kt-leftover', 'w').write('x')\n        return [0, 1]"
+reader = "import os\nclass Solution:\n    def twoSum(self, n, t):\n        return [os.path.exists('/tmp/kt-leftover')]"
+run_job(job(two_sum, writer, [[[2, 7], 9]], [[0, 1]], tl=1000), 2)
+leftover = run_job(job(two_sum, reader, [[[2, 7], 9]], None, tl=1000), 2)["results"][0].get("output") != [False]
+fake_done = "class Solution:\n    def twoSum(self, n, t):\n        return {'type': 'done'}"
+r = run_job(job(two_sum, fake_done, [[[2, 7], 9], [[3, 3], 6]], [[0, 1], [0, 1]], tl=1000), 2)
+cut_short = r["status"] != "ok" or len(r["results"]) != 2
+failures += leftover + cut_short
+print(f"  {'LEAK' if leftover else 'ok  '} tmp files cleaned between jobs")
+print(f"  {'FAIL' if cut_short else 'ok  '} returned {{'type': 'done'}} doesn't end the job early")
+
 print("\nALL GOOD" if not failures else f"\n{failures} FAILURE(S)")
 sys.exit(1 if failures else 0)
