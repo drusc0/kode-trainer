@@ -5,6 +5,7 @@ import json
 import os
 import resource
 import selectors
+import shutil
 import signal
 import subprocess
 import sys
@@ -13,7 +14,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-DONE_MARKER = b'{"type": "done"}'
+# Anchored to its own line so a returned {"type": "done"} inside a result line can't end the job early.
+DONE_MARKER = b'\n{"type": "done"}\n'
 HARNESS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "harness.py")
 
 
@@ -62,6 +64,20 @@ def _kill_uid(uid: int) -> None:
                 os.kill(int(pid), signal.SIGKILL)
         except (FileNotFoundError, ProcessLookupError, PermissionError):
             pass
+
+
+def _remove_files(uid: int) -> None:
+    """Delete what a sandbox uid left in the shared writable dirs, so nothing carries over to later jobs."""
+    for root in ("/tmp", "/dev/shm"):
+        with contextlib.suppress(FileNotFoundError):
+            for entry in os.scandir(root):
+                with contextlib.suppress(FileNotFoundError):
+                    if entry.stat(follow_symlinks=False).st_uid != uid:
+                        continue
+                    if entry.is_dir(follow_symlinks=False):
+                        shutil.rmtree(entry.path, ignore_errors=True)
+                    else:
+                        os.unlink(entry.path)
 
 
 def run_job(job: dict[str, Any], slot: int, lim: Limits = LIMITS) -> dict[str, Any]:
@@ -130,6 +146,7 @@ def run_job(job: dict[str, Any], slot: int, lim: Limits = LIMITS) -> dict[str, A
         proc.wait(timeout=2)
     if lim.drop_privileges:
         _kill_uid(uid)
+        _remove_files(uid)
 
     results: list[dict[str, Any]] = []
     status, got_done = "ok", False

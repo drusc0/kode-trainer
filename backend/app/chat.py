@@ -1,11 +1,7 @@
-"""The problem chat assistant: a Socratic interview colleague backed by Claude."""
-
-import anthropic
-from anthropic import AsyncAnthropic
-from anthropic.types import MessageParam
+"""The problem chat assistant: a Socratic interview colleague backed by the configured LLM."""
 
 from .catalog.base import Problem
-from .core import settings
+from .llm import ChatError, LLMProvider, Message
 from .schemas import ChatMessage, Example
 
 # ponytail: plain cap on what we resend; summarize older turns if long chats start to matter.
@@ -32,20 +28,6 @@ solution"). A short snippet illustrating one idea is fine.
 - The reference solution is for your eyes only. Use it to check their reasoning and your own \
 claims; don't quote or paraphrase it line by line.
 - Keep replies short and conversational (a few sentences or a short list), in Markdown."""
-
-
-class ChatError(RuntimeError):
-    pass
-
-
-_client: AsyncAnthropic | None = None
-
-
-def client() -> AsyncAnthropic:
-    global _client
-    if _client is None:
-        _client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-    return _client
 
 
 def build_system_prompt(p: Problem, examples: list[Example]) -> str:
@@ -86,26 +68,10 @@ def user_turn(message: str, code: str) -> str:
     return f"<my_current_code>\n```python\n{code.rstrip()}\n```\n</my_current_code>\n\n{message}"
 
 
-async def reply(client: AsyncAnthropic, model: str, system: str, history: list[ChatMessage], turn: str) -> str:
-    messages: list[MessageParam] = [{"role": m.role, "content": m.content} for m in history[-HISTORY_LIMIT:]]
+async def reply(provider: LLMProvider, system: str, history: list[ChatMessage], turn: str) -> str:
+    messages: list[Message] = [{"role": m.role, "content": m.content} for m in history[-HISTORY_LIMIT:]]
     messages.append({"role": "user", "content": turn})
-    try:
-        resp = await client.messages.create(
-            model=model,
-            max_tokens=16000,
-            system=system,
-            messages=messages,
-            cache_control={"type": "ephemeral"},
-        )
-    except anthropic.RateLimitError as e:
-        raise ChatError("The assistant is busy right now. Try again in a moment.") from e
-    except anthropic.APIStatusError as e:
-        raise ChatError(f"The assistant returned an error ({e.status_code}).") from e
-    except anthropic.APIConnectionError as e:
-        raise ChatError("Couldn't reach the assistant. Check your internet connection.") from e
-    if resp.stop_reason == "refusal":
-        raise ChatError("The assistant declined to answer that. Try rephrasing.")
-    text = "".join(b.text for b in resp.content if b.type == "text")
+    text = await provider.complete(system, messages)
     if not text.strip():
         raise ChatError("The assistant returned an empty reply. Try again.")
     return text

@@ -22,7 +22,7 @@ make up                  # creates .env with a random RUNNER_TOKEN, builds and s
 open http://localhost:8080
 ```
 
-To enable the chat assistant, add your Anthropic key to `.env` (`ANTHROPIC_API_KEY=...`) and run `make up` again.
+To enable the chat assistant, add an Anthropic, OpenAI, Gemini or OpenRouter key to `.env` (`LLM_API_KEY=...`) and run `make up` again.
 
 On first start the API **seeds** the problems: it runs each reference solution in the sandbox to compute expected outputs for the hidden tests, which takes about 10–20 seconds. `GET /api/health` shows progress. Seeding only reruns for problems whose definition changed.
 
@@ -41,9 +41,9 @@ Other commands:
 
 ### Chat assistant
 
-The workspace has a **Chat** tab: a colleague powered by Claude that you can talk the problem through with. It sees the problem, every example, the hints, the hidden reference solution and your current code. It asks what you've tried, gives hints in steps and points at the line in your code that's wrong, but won't write the solution unless you ask for it. Conversations are saved per session and problem.
+The workspace has a **Chat** tab: a colleague powered by the LLM of your choice that you can talk the problem through with. It sees the problem, every example, the hints, the hidden reference solution and your current code. It asks what you've tried, gives hints in steps and points at the line in your code that's wrong, but won't write the solution unless you ask for it. Conversations are saved per session and problem.
 
-It needs `ANTHROPIC_API_KEY` in `.env`. `CHAT_MODEL` picks the model (default `claude-sonnet-5`). Without a key everything else works and the tab explains how to turn it on.
+It needs `LLM_API_KEY` in `.env`; the key's prefix picks the provider (`sk-ant-` Anthropic, `sk-or-` OpenRouter, `sk-` OpenAI, `AIza` Gemini; see `backend/app/llm.py`). `CHAT_MODEL` picks the model (defaults: `claude-sonnet-5`, `gpt-5`, `gemini-2.5-flash`, `openai/gpt-5`). Without a key everything else works and the tab explains how to turn it on.
 
 ### API types
 
@@ -86,15 +86,16 @@ User code is untrusted. The defences are layered so that no single failure expos
 3. **Per-job process isolation.** Each job runs in a fresh process under a **dedicated unprivileged uid per slot**, in its own session and process group. It gets a clean environment (`PATH`, `LANG`, `HOME` only — secrets aren't visible), `python -I` isolated mode, and a working directory it can't write to.
 4. **Resource limits (rlimits).** Address space 512 MB, CPU time, 1 MB max file size, 64 open files, 16 processes (stops fork bombs), no core dumps.
 5. **seccomp filter** installed by the harness before any user code runs. `socket`, `connect`, `execve`, `ptrace`, `mount`, `unshare`, `bpf`, `io_uring`, `setrlimit` and similar calls fail with `EPERM`.
-6. **Timeouts and cleanup.** A per-test time limit (SIGALRM), a wall-clock limit for the whole job, an output size cap, then `killpg` plus a sweep that kills every remaining process owned by the job's uid.
+6. **Timeouts and cleanup.** A per-test time limit (SIGALRM), a wall-clock limit for the whole job, an output size cap, then `killpg` plus a sweep that kills every remaining process owned by the job's uid and deletes any files it left in `/tmp` or `/dev/shm`.
 7. **Authenticated runner API.** Requests need the shared `RUNNER_TOKEN`.
+8. **Host allowlist on the API.** It only answers to the hostnames in `ALLOWED_HOSTS` (default `localhost,127.0.0.1`), so a web page can't use DNS rebinding to reach your local instance.
 
 `make test-sandbox` checks this with hostile submissions: network access, subprocess/exec, infinite loops, memory bombs, fork bombs, writes to the code directory, and reading environment secrets.
 
 **Known limits.**
 - The harness and your code share one Python process. A determined user could tamper with *their own* results, which only affects their own practice.
 - The container shares the host kernel. For stronger isolation on Linux, install [gVisor](https://gvisor.dev) and uncomment `runtime: runsc` in `docker-compose.yml`. This is recommended before exposing KodeTrain beyond your own machine.
-- There's no authentication yet. The ports bind to `127.0.0.1` only. Add auth before hosting it for other people.
+- There's no authentication yet. The ports bind to `127.0.0.1` only. To reach it from your other devices, put it behind something that does the login for you, such as [Tailscale](https://tailscale.com) or Cloudflare Access, rather than opening the ports. Everyone who can reach an instance shares its sessions.
 
 ## Adding a problem
 
@@ -134,3 +135,7 @@ cd frontend && corepack pnpm install && corepack pnpm dev
 Local tooling needs [uv](https://docs.astral.sh/uv/) and Node 24 (which ships `corepack`, so pnpm needs no separate install).
 
 Note that the unsafe runner flags remove the sandbox's main protections. Use them only with your own code.
+
+## License
+
+[MIT](LICENSE)

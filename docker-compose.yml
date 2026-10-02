@@ -38,8 +38,9 @@ services:
       RUNNER_URL: http://runner:8080
       RUNNER_TOKEN: ${RUNNER_TOKEN:?set RUNNER_TOKEN in .env}
       CORS_ORIGINS: http://localhost:5173,http://localhost:8080
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      CHAT_MODEL: ${CHAT_MODEL:-claude-sonnet-5}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      CHAT_MODEL: ${CHAT_MODEL:-}
     ports: ["127.0.0.1:8000:8000"]  # for `npm run dev`; nginx proxies /api in the full stack
     networks: [backend, sandbox]
 

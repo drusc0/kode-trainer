@@ -1,12 +1,9 @@
 import asyncio
-from types import SimpleNamespace
-from typing import Any, cast
 
 import pytest
-from anthropic import AsyncAnthropic
 from fastapi.testclient import TestClient
 
-from app import chat, judge
+from app import chat, judge, llm
 from app.catalog import BY_SLUG, PROBLEMS
 from app.catalog.base import Problem
 from app.core import settings
@@ -21,19 +18,14 @@ EXAMPLES = [
 ]
 
 
-class FakeMessages:
-    def __init__(self, response: Any) -> None:
-        self.response = response
-        self.calls: list[dict[str, Any]] = []
+class FakeProvider:
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.calls: list[tuple[str, list[llm.Message]]] = []
 
-    async def create(self, **kwargs: Any) -> Any:
-        self.calls.append(kwargs)
-        return self.response
-
-
-def fake_client(text: str, stop_reason: str = "end_turn") -> tuple[AsyncAnthropic, FakeMessages]:
-    messages = FakeMessages(SimpleNamespace(stop_reason=stop_reason, content=[SimpleNamespace(type="text", text=text)]))
-    return cast(AsyncAnthropic, SimpleNamespace(messages=messages)), messages
+    async def complete(self, system: str, messages: list[llm.Message]) -> str:
+        self.calls.append((system, messages))
+        return self.text
 
 
 def test_system_prompt_carries_the_whole_problem() -> None:
@@ -56,14 +48,13 @@ def test_user_turn_without_code_is_just_the_message() -> None:
 
 
 def test_reply_sends_history_then_turn_and_returns_text() -> None:
-    client, messages = fake_client("Try a hash map.")
+    provider = FakeProvider("Try a hash map.")
     history = [ChatMessage(role="user", content="hi"), ChatMessage(role="assistant", content="hello")]
-    out = asyncio.run(chat.reply(client, "claude-sonnet-5", "SYSTEM", history, "a hint?"))
+    out = asyncio.run(chat.reply(provider, "SYSTEM", history, "a hint?"))
     assert out == "Try a hash map."
-    call = messages.calls[0]
-    assert call["model"] == "claude-sonnet-5"
-    assert call["system"] == "SYSTEM"
-    assert call["messages"] == [
+    system, messages = provider.calls[0]
+    assert system == "SYSTEM"
+    assert messages == [
         {"role": "user", "content": "hi"},
         {"role": "assistant", "content": "hello"},
         {"role": "user", "content": "a hint?"},
@@ -71,38 +62,31 @@ def test_reply_sends_history_then_turn_and_returns_text() -> None:
 
 
 def test_reply_caps_history() -> None:
-    client, messages = fake_client("ok")
+    provider = FakeProvider("ok")
     history = [ChatMessage(role="user" if i % 2 == 0 else "assistant", content=str(i)) for i in range(100)]
-    asyncio.run(chat.reply(client, "m", "S", history, "latest"))
-    sent = messages.calls[0]["messages"]
+    asyncio.run(chat.reply(provider, "S", history, "latest"))
+    _, sent = provider.calls[0]
     assert len(sent) == chat.HISTORY_LIMIT + 1
     assert sent[0] == {"role": "user", "content": "60"}
     assert sent[-1] == {"role": "user", "content": "latest"}
 
 
-def test_reply_refusal_raises_chat_error() -> None:
-    client, _ = fake_client("", stop_reason="refusal")
-    with pytest.raises(chat.ChatError):
-        asyncio.run(chat.reply(client, "m", "S", [], "x"))
-
-
 def test_chat_without_key_returns_503(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "anthropic_api_key", "")
-    resp = TestClient(app).post(CHAT_URL, json={"message": "hint?", "code": ""})
+    monkeypatch.setattr(settings, "llm_api_key", "")
+    resp = TestClient(app, base_url="http://localhost").post(CHAT_URL, json={"message": "hint?", "code": ""})
     assert resp.status_code == 503
-    assert "ANTHROPIC_API_KEY" in resp.json()["detail"]
+    assert "LLM_API_KEY" in resp.json()["detail"]
 
 
 def test_blank_message_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
-    resp = TestClient(app).post(CHAT_URL, json={"message": "   ", "code": ""})
+    monkeypatch.setattr(settings, "llm_api_key", "sk-ant-test")
+    resp = TestClient(app, base_url="http://localhost").post(CHAT_URL, json={"message": "   ", "code": ""})
     assert resp.status_code == 422
 
 
 def test_reply_without_text_raises_chat_error() -> None:
-    client, _ = fake_client("  \n")
-    with pytest.raises(chat.ChatError):
-        asyncio.run(chat.reply(client, "m", "S", [], "x"))
+    with pytest.raises(llm.ChatError):
+        asyncio.run(chat.reply(FakeProvider("  \n"), "S", [], "x"))
 
 
 @pytest.mark.parametrize("p", PROBLEMS, ids=lambda p: p.slug)
