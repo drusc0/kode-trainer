@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
-from . import chat, judge
+from . import chat, judge, llm
 from .catalog import BY_SLUG, PATTERNS, PROBLEMS, Problem
 from .core import Doc, RunnerError, db, ensure_indexes, now, settings
 from .schemas import (
@@ -328,8 +328,10 @@ async def get_chat(session_id: str, slug: str) -> Doc:
 
 @app.post("/api/sessions/{session_id}/problems/{slug}/chat", response_model=ChatReply)
 async def send_chat(session_id: str, slug: str, body: ChatIn) -> Doc:
-    if not settings.anthropic_api_key:
-        raise HTTPException(503, "Chat is not configured: set ANTHROPIC_API_KEY in .env")
+    try:
+        provider = llm.provider()
+    except ValueError as e:
+        raise HTTPException(503, str(e)) from e
     await get_session(session_id)
     p = get_problem(slug)
     key = {"session_id": session_id, "problem": slug}
@@ -337,10 +339,8 @@ async def send_chat(session_id: str, slug: str, body: ChatIn) -> Doc:
     history = [ChatMessage(**m) for m in doc["messages"]] if doc else []
     system = chat.build_system_prompt(p, await example_views(p))
     try:
-        text = await chat.reply(
-            chat.client(), settings.chat_model, system, history, chat.user_turn(body.message, body.code)
-        )
-    except chat.ChatError as e:
+        text = await chat.reply(provider, system, history, chat.user_turn(body.message, body.code))
+    except llm.ChatError as e:
         raise HTTPException(502, str(e)) from e
     answer = ChatMessage(role="assistant", content=text)
     await db().chats.update_one(
