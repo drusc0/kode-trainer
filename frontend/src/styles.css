@@ -949,14 +949,21 @@ span.case-tab > .x {
 }
 .pattern-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
+  grid-template-columns: minmax(0, 1fr) 380px;
   gap: 28px;
   margin-top: 22px;
   align-items: start;
 }
-.practice {
+.pattern-side {
   position: sticky;
   top: 74px;
+  max-height: calc(100vh - 90px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.practice {
+  flex-shrink: 0;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -1117,8 +1124,12 @@ a.plain:hover {
   .stats-grid {
     grid-template-columns: 1fr;
   }
-  .practice {
+  .pattern-side {
     position: static;
+    max-height: none;
+  }
+  .mentor {
+    max-height: 80vh;
   }
   .progress-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -1207,13 +1218,23 @@ button.chip {
   cursor: pointer;
 }
 .mentor {
-  margin-top: 36px;
-  padding: 16px;
+  flex: 1;
+  min-height: 240px;
+  overflow-y: auto;
+  padding: 16px 16px 0;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  scroll-margin-top: 74px;
 }
-.mentor h2 {
+.mentor h3 {
   margin-top: 0;
+}
+.mentor .chat {
+  min-height: calc(100% - 40px);
+}
+.mentor .chat-compose {
+  padding-bottom: 12px;
+}
+.mentor .md {
+  font-size: 14px;
 }

@@ -35,7 +35,8 @@ export default function ChatPanel({
     };
   }, [path]);
 
-  // Skip the history load itself: below a long pattern guide it would yank the page down to the chat.
+  // Skip the history load itself: on narrow screens the pattern chat sits below the guide and this would yank the page.
+  // "nearest" scrolls only the chat's own scroll box when it's already on screen, not the window.
   const loaded = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: these are re-scroll triggers, not values read inside
   useEffect(() => {
@@ -43,7 +44,7 @@ export default function ChatPanel({
       loaded.current = messages !== null;
       return;
     }
-    endRef.current?.scrollIntoView({ block: "end" });
+    endRef.current?.scrollIntoView({ block: "nearest" });
   }, [messages, busy, hidden]);
 
   const send = async (text = draft.trim()) => {
@@ -100,7 +101,6 @@ export default function ChatPanel({
       ))}
       {busy && <p className="muted">Thinking…</p>}
       {error && <div className="notice fail">{error}</div>}
-      <div ref={endRef} />
       <div className="chat-compose">
         <textarea
           value={draft}
@@ -122,6 +122,7 @@ export default function ChatPanel({
           )}
         </div>
       </div>
+      <div ref={endRef} />
     </div>
   );
 }
