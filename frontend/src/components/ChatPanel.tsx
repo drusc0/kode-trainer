@@ -4,15 +4,19 @@ import Markdown from "./Markdown";
 
 // Stays mounted while hidden so an in-flight reply (or its error and the restored draft) survives tab switches.
 export default function ChatPanel({
-  sessionId,
-  slug,
-  code,
-  hidden,
+  path,
+  code = "",
+  hidden = false,
+  intro,
+  placeholder,
+  suggestions = [],
 }: {
-  sessionId: string;
-  slug: string;
-  code: string;
-  hidden: boolean;
+  path: string;
+  code?: string;
+  hidden?: boolean;
+  intro: string;
+  placeholder: string;
+  suggestions?: string[];
 }) {
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [draft, setDraft] = useState("");
@@ -22,29 +26,34 @@ export default function ChatPanel({
 
   useEffect(() => {
     let cancelled = false;
-    api.chat(sessionId, slug).then(
+    api.chat(path).then(
       (h) => !cancelled && setMessages(h.messages),
       (e: Error) => !cancelled && setError(e.message),
     );
     return () => {
       cancelled = true;
     };
-  }, [sessionId, slug]);
+  }, [path]);
 
+  // Skip the history load itself: below a long pattern guide it would yank the page down to the chat.
+  const loaded = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: these are re-scroll triggers, not values read inside
   useEffect(() => {
+    if (!loaded.current) {
+      loaded.current = messages !== null;
+      return;
+    }
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages, busy, hidden]);
 
-  const send = async () => {
-    const text = draft.trim();
+  const send = async (text = draft.trim()) => {
     if (!text || busy) return;
     setBusy(true);
     setError(null);
     setDraft("");
     setMessages((m) => [...(m ?? []), { role: "user", content: text }]);
     try {
-      const { message } = await api.sendChat(sessionId, slug, text, code);
+      const { message } = await api.sendChat(path, text, code);
       setMessages((m) => [...(m ?? []), message]);
     } catch (e) {
       setMessages((m) => (m ?? []).slice(0, -1));
@@ -63,7 +72,7 @@ export default function ChatPanel({
   };
 
   const clear = async () => {
-    await api.clearChat(sessionId, slug);
+    await api.clearChat(path);
     setMessages([]);
   };
 
@@ -71,10 +80,18 @@ export default function ChatPanel({
     <div className="chat" hidden={hidden}>
       {messages === null && !error && <p className="muted">Loading chat…</p>}
       {messages?.length === 0 && (
-        <p className="muted">
-          Talk the problem through: ask for a hint, another example, edge cases, or feedback on your code. Your current
-          code is shared with every message.
-        </p>
+        <>
+          <p className="muted">{intro}</p>
+          {suggestions.length > 0 && (
+            <div className="chat-suggestions">
+              {suggestions.map((s) => (
+                <button key={s} type="button" className="chip" onClick={() => void send(s)} disabled={busy}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
       {messages?.map((m, i) => (
         <div key={i} className={`chat-msg ${m.role}`}>
@@ -89,7 +106,7 @@ export default function ChatPanel({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Ask your colleague… (Enter to send, Shift+Enter for a new line)"
+          placeholder={placeholder}
           aria-label="Message"
           disabled={busy}
         />

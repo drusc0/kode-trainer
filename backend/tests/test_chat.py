@@ -112,3 +112,28 @@ def test_system_prompt_builds_for_every_problem(p: Problem) -> None:
     ]
     prompt = chat.build_system_prompt(p, examples)
     assert f"Example {len(examples)}:" in prompt
+
+
+PATTERN_CHAT_URL = "/api/sessions/000000000000000000000000/patterns/sliding-window/chat"
+
+
+def test_pattern_prompt_is_a_mentor_without_reference_solutions() -> None:
+    problems = [p for p in PROBLEMS if p.pattern == "sliding-window"]
+    prompt = chat.build_pattern_prompt("sliding-window", problems)
+    assert prompt.startswith(chat.MENTOR)
+    assert 'name="sliding window"' in prompt
+    assert all(f"- {p.title} ({p.difficulty})" in prompt for p in problems)
+    assert not any(p.reference.strip() in prompt for p in problems)
+
+
+def test_pattern_chat_without_key_returns_503(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "anthropic_api_key", "")
+    resp = TestClient(app, base_url="http://localhost").post(PATTERN_CHAT_URL, json={"message": "why O(n)?"})
+    assert resp.status_code == 503
+
+
+def test_unknown_pattern_chat_returns_404(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
+    url = PATTERN_CHAT_URL.replace("sliding-window", "nope")
+    resp = TestClient(app, base_url="http://localhost").post(url, json={"message": "hi"})
+    assert resp.status_code == 404

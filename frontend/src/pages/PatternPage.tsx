@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, type ProblemSummary } from "../api";
+import { api, type ProblemSummary, patternChatPath } from "../api";
+import ChatPanel from "../components/ChatPanel";
 import Markdown from "../components/Markdown";
 import { DifficultyTag, StatusMark } from "../components/ui";
 import { PATTERNS, patternBody } from "../content/patterns";
 import { useSession } from "../session";
+
+const MENTOR_STARTERS = [
+  "Explain this like I'm new to it",
+  "Walk me through a small example step by step",
+  "Draw me a diagram of how it works",
+  "How do I tell this pattern apart from similar ones?",
+];
 
 export default function PatternPage() {
   const { slug = "" } = useParams();
@@ -44,6 +52,18 @@ export default function PatternPage() {
       <div className="pattern-layout">
         <article>
           <Markdown>{patternBody(slug)}</Markdown>
+          {current && (
+            <section id="mentor" className="mentor">
+              <h2>Ask your mentor</h2>
+              <ChatPanel
+                key={slug}
+                path={patternChatPath(current.id, slug)}
+                intro={`Stuck on something in this guide? Ask a follow-up question and your mentor will explain ${pattern.title.toLowerCase()} in simple terms, with examples and diagrams.`}
+                placeholder="Ask a follow-up question… (Enter to send, Shift+Enter for a new line)"
+                suggestions={MENTOR_STARTERS}
+              />
+            </section>
+          )}
         </article>
         <aside className="practice">
           <h3>Practise it</h3>
@@ -63,6 +83,11 @@ export default function PatternPage() {
             </ul>
           )}
           <p className="muted small">Status shown for session “{current?.name}”.</p>
+          {current && (
+            <a href="#mentor" className="small">
+              Questions? Ask your mentor ↓
+            </a>
+          )}
         </aside>
       </div>
 

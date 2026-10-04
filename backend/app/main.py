@@ -189,7 +189,7 @@ async def update_session(session_id: str, body: SessionPatch) -> Doc:
 @app.delete("/api/sessions/{session_id}", status_code=204)
 async def delete_session(session_id: str) -> None:
     s = await get_session(session_id)
-    for coll in ("submissions", "drafts", "progress", "chats"):
+    for coll in ("submissions", "drafts", "progress", "chats", "pattern_chats"):
         await db()[coll].delete_many({"session_id": session_id})
     await db().sessions.delete_one({"_id": s["_id"]})
 
@@ -318,24 +318,24 @@ async def list_submissions(session_id: str, slug: str, limit: int = Query(30, ge
 
 
 # ---------------------------------------------------------------- chat
-@app.get("/api/sessions/{session_id}/problems/{slug}/chat", response_model=ChatHistory)
-async def get_chat(session_id: str, slug: str) -> Doc:
-    await get_session(session_id)
-    get_problem(slug)
-    doc = await db().chats.find_one({"session_id": session_id, "problem": slug})
+def require_chat() -> None:
+    if not settings.anthropic_api_key:
+        raise HTTPException(503, "Chat is not configured: set ANTHROPIC_API_KEY in .env")
+
+
+def get_pattern(slug: str) -> str:
+    if slug not in PATTERNS:
+        raise HTTPException(404, "Pattern not found")
+    return slug
+
+
+async def load_chat(coll: str, key: Doc) -> Doc:
+    doc = await db()[coll].find_one(key)
     return {"messages": doc["messages"] if doc else []}
 
 
-@app.post("/api/sessions/{session_id}/problems/{slug}/chat", response_model=ChatReply)
-async def send_chat(session_id: str, slug: str, body: ChatIn) -> Doc:
-    if not settings.anthropic_api_key:
-        raise HTTPException(503, "Chat is not configured: set ANTHROPIC_API_KEY in .env")
-    await get_session(session_id)
-    p = get_problem(slug)
-    key = {"session_id": session_id, "problem": slug}
-    doc = await db().chats.find_one(key)
-    history = [ChatMessage(**m) for m in doc["messages"]] if doc else []
-    system = chat.build_system_prompt(p, await example_views(p))
+async def chat_turn(coll: str, key: Doc, system: str, body: ChatIn) -> Doc:
+    history = [ChatMessage(**m) for m in (await load_chat(coll, key))["messages"]]
     try:
         text = await chat.reply(
             chat.client(), settings.chat_model, system, history, chat.user_turn(body.message, body.code)
@@ -343,7 +343,7 @@ async def send_chat(session_id: str, slug: str, body: ChatIn) -> Doc:
     except chat.ChatError as e:
         raise HTTPException(502, str(e)) from e
     answer = ChatMessage(role="assistant", content=text)
-    await db().chats.update_one(
+    await db()[coll].update_one(
         key,
         {
             "$push": {"messages": {"$each": [{"role": "user", "content": body.message}, answer.model_dump()]}},
@@ -354,6 +354,43 @@ async def send_chat(session_id: str, slug: str, body: ChatIn) -> Doc:
     return {"message": answer}
 
 
+@app.get("/api/sessions/{session_id}/problems/{slug}/chat", response_model=ChatHistory)
+async def get_chat(session_id: str, slug: str) -> Doc:
+    await get_session(session_id)
+    get_problem(slug)
+    return await load_chat("chats", {"session_id": session_id, "problem": slug})
+
+
+@app.post("/api/sessions/{session_id}/problems/{slug}/chat", response_model=ChatReply)
+async def send_chat(session_id: str, slug: str, body: ChatIn) -> Doc:
+    require_chat()
+    await get_session(session_id)
+    p = get_problem(slug)
+    system = chat.build_system_prompt(p, await example_views(p))
+    return await chat_turn("chats", {"session_id": session_id, "problem": slug}, system, body)
+
+
 @app.delete("/api/sessions/{session_id}/problems/{slug}/chat", status_code=204)
 async def clear_chat(session_id: str, slug: str) -> None:
     await db().chats.delete_one({"session_id": session_id, "problem": slug})
+
+
+@app.get("/api/sessions/{session_id}/patterns/{slug}/chat", response_model=ChatHistory)
+async def get_pattern_chat(session_id: str, slug: str) -> Doc:
+    get_pattern(slug)
+    await get_session(session_id)
+    return await load_chat("pattern_chats", {"session_id": session_id, "pattern": slug})
+
+
+@app.post("/api/sessions/{session_id}/patterns/{slug}/chat", response_model=ChatReply)
+async def send_pattern_chat(session_id: str, slug: str, body: ChatIn) -> Doc:
+    require_chat()
+    get_pattern(slug)
+    await get_session(session_id)
+    system = chat.build_pattern_prompt(slug, [p for p in PROBLEMS if p.pattern == slug])
+    return await chat_turn("pattern_chats", {"session_id": session_id, "pattern": slug}, system, body)
+
+
+@app.delete("/api/sessions/{session_id}/patterns/{slug}/chat", status_code=204)
+async def clear_pattern_chat(session_id: str, slug: str) -> None:
+    await db().pattern_chats.delete_one({"session_id": session_id, "pattern": slug})
