@@ -1,5 +1,5 @@
 FROM node:26-alpine AS build
-RUN corepack enable
+RUN npm install -g corepack@0.36.0 && corepack enable
 WORKDIR /web
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
