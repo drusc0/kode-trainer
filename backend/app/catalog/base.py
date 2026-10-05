@@ -119,3 +119,30 @@ def level_order(root: dict[str, Any] | None) -> list[int | None]:
     while out and out[-1] is None:
         out.pop()
     return out
+
+
+def ops_case(
+    r: random.Random, cls: str, ctor_args: list[Any], n: int, make: Callable[[], tuple[str, list[Any]]]
+) -> list[Any]:
+    ops, args = [cls], [ctor_args]
+    for _ in range(n):
+        op, a = make()
+        ops.append(op)
+        args.append(a)
+    return [{"ops": ops, "args": args}]
+
+
+def course_case(r: random.Random, n: int, cyclic: bool) -> list[Any]:
+    order = list(range(n))
+    r.shuffle(order)
+    pos = {c: i for i, c in enumerate(order)}
+    pairs: set[tuple[int, int]] = set()
+    for _ in range(min(5000, n * 2)):
+        a, b = r.sample(range(n), 2)
+        if pos[a] < pos[b]:
+            a, b = b, a
+        pairs.add((a, b))  # b before a: consistent with order, so acyclic
+    if cyclic and pairs:
+        a, b = next(iter(pairs))
+        pairs.add((b, a))
+    return [n, [list(p) for p in pairs]]
