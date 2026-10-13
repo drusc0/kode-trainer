@@ -1,5 +1,5 @@
 # Isolated code runner. User code runs on this image's Python 3.12.
-FROM python:3.12-slim
+FROM python:3.14-slim
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libseccomp2 \
  && rm -rf /var/lib/apt/lists/*
