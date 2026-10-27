@@ -29,6 +29,7 @@ def job(p, code, tests, expected=None, tl=None):
         "expected": expected,
         "compare": p.compare,
         "time_limit_ms": tl or 10_000,
+        "codec": p.codec,
     }
 
 

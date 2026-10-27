@@ -29,14 +29,21 @@ class Problem:
     time_limit_ms: int = 2000
     starter: str | None = None  # required for design problems
     seed_version: int = 1  # bump to regenerate this problem's hidden tests
+    codec: tuple[str, str] | None = None  # (encode, decode): the output is Codec().decode(Codec().encode(*args))
 
     def display_type(self, t: str) -> str:
-        return "TreeNode" if t.startswith("TreeNode@") else t
+        if t.startswith("TreeNode@"):
+            return "TreeNode"
+        if t.startswith("ListNode@"):
+            return "Optional[ListNode]"
+        if t.startswith("CyclePos@"):
+            return "int"
+        return "Optional['Node']" if t in ("GraphNode", "RandomList") else t
 
     def starter_code(self) -> str:
         if self.starter:
             return self.starter.strip("\n") + "\n"
-        sig = ", ".join(f"{n}: {self.display_type(t)}" for n, t in self.params)
+        sig = ", ".join(f"{n}: {self.display_type(t)}" for n, t in self.params if not t.startswith("CyclePos@"))
         pre = ""
         types = " ".join(t for _, t in self.params) + " " + self.returns
         if "ListNode" in types:
@@ -44,12 +51,24 @@ class Problem:
                 "# Definition for singly-linked list.\n# class ListNode:\n#     def __init__(self, val=0, next=None):\n"
                 "#         self.val = val\n#         self.next = next\n"
             )
+        if "GraphNode" in types:
+            pre += (
+                "# Definition for a Node.\n# class Node:\n#     def __init__(self, val=0, neighbors=None):\n"
+                "#         self.val = val\n#         self.neighbors = neighbors if neighbors is not None else []\n"
+            )
+        if "RandomList" in types:
+            pre += (
+                "# Definition for a Node.\n# class Node:\n#     def __init__(self, x, next=None, random=None):\n"
+                "#         self.val = int(x)\n#         self.next = next\n#         self.random = random\n"
+            )
         if "TreeNode" in types:
             pre += (
                 "# Definition for a binary tree node.\n# class TreeNode:\n#     def __init__(self, val=0, left=None, right=None):\n"
                 "#         self.val = val\n#         self.left = left\n#         self.right = right\n"
             )
-        return f"{pre}class Solution:\n    def {self.entry}(self, {sig}) -> {self.returns}:\n        \n"
+        return (
+            f"{pre}class Solution:\n    def {self.entry}(self, {sig}) -> {self.display_type(self.returns)}:\n        \n"
+        )
 
     def param_types(self) -> list[str]:
         return [t for _, t in self.params]

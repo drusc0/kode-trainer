@@ -66,6 +66,7 @@ def make_job(
         "expected": expected,
         "compare": p.compare,
         "time_limit_ms": time_limit_ms or p.time_limit_ms,
+        "codec": p.codec,
     }
 
 

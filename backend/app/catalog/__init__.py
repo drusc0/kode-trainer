@@ -48,7 +48,9 @@ BY_SLUG: dict[str, Problem] = {p.slug: p for p in PROBLEMS}
 assert len(BY_SLUG) == len(PROBLEMS), "duplicate problem slug"
 for _p in PROBLEMS:
     assert _p.pattern in PATTERNS, f"{_p.slug}: unknown pattern {_p.pattern}"
-    assert _p.kind == "function" or _p.starter, f"{_p.slug}: design problems need starter code"
+    assert (_p.kind == "function" and not _p.codec) or _p.starter, (
+        f"{_p.slug}: design and codec problems need starter code"
+    )
 
 
 def problem_fingerprint(p: Problem) -> str:
@@ -64,6 +66,7 @@ def problem_fingerprint(p: Problem) -> str:
             "ret": p.returns,
             "tl": p.time_limit_ms,
             "v": p.seed_version,
+            **({"codec": p.codec} if p.codec else {}),
         },
         sort_keys=True,
         default=str,
