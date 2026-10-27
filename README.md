@@ -22,7 +22,7 @@ make up                  # creates .env with a random RUNNER_TOKEN, builds and s
 open http://localhost:8080
 ```
 
-To enable the chat assistant, add your Anthropic key to `.env` (`ANTHROPIC_API_KEY=...`) and run `make up` again.
+To enable the chat assistant, add an Anthropic, OpenAI, Gemini or OpenRouter key to `.env` (`LLM_API_KEY=...`) and run `make up` again.
 
 On first start the API **seeds** the problems: it runs each reference solution in the sandbox to compute expected outputs for the hidden tests, which takes about 10–20 seconds. `GET /api/health` shows progress. Seeding only reruns for problems whose definition changed.
 
@@ -41,9 +41,9 @@ Other commands:
 
 ### Chat assistant
 
-The workspace has a **Chat** tab: a colleague powered by Claude that you can talk the problem through with. It sees the problem, every example, the hints, the hidden reference solution and your current code. It asks what you've tried, gives hints in steps and points at the line in your code that's wrong, but won't write the solution unless you ask for it. Conversations are saved per session and problem.
+The workspace has a **Chat** tab: a colleague powered by the LLM of your choice that you can talk the problem through with. It sees the problem, every example, the hints, the hidden reference solution and your current code. It asks what you've tried, gives hints in steps and points at the line in your code that's wrong, but won't write the solution unless you ask for it. Conversations are saved per session and problem.
 
-It needs `ANTHROPIC_API_KEY` in `.env`. `CHAT_MODEL` picks the model (default `claude-sonnet-5`). Without a key everything else works and the tab explains how to turn it on.
+It needs `LLM_API_KEY` in `.env`; the key's prefix picks the provider (`sk-ant-` Anthropic, `sk-or-` OpenRouter, `sk-` OpenAI, `AIza` Gemini; see `backend/app/llm.py`). `CHAT_MODEL` picks the model (defaults: `claude-sonnet-5`, `gpt-5`, `gemini-2.5-flash`, `openai/gpt-5`). Without a key everything else works and the tab explains how to turn it on.
 
 ### API types
 

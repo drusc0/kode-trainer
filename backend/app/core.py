@@ -24,8 +24,9 @@ class Settings:
     )
     max_code_bytes: int = 64 * 1024
     max_custom_cases: int = 10
-    anthropic_api_key: str = os.environ.get("ANTHROPIC_API_KEY", "")
-    chat_model: str = os.environ.get("CHAT_MODEL", "claude-sonnet-5")
+    # Anthropic, OpenAI, Gemini or OpenRouter: the key's prefix picks the provider (app/llm.py).
+    llm_api_key: str = os.environ.get("LLM_API_KEY", "")
+    chat_model: str = os.environ.get("CHAT_MODEL", "")  # empty = the provider's default
 
 
 settings = Settings()
