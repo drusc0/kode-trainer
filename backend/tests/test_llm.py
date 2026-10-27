@@ -9,7 +9,11 @@ from anthropic import AsyncAnthropic
 
 from app import llm
 
-MESSAGES: list[llm.Message] = [{"role": "user", "content": "a hint?"}]
+MESSAGES: list[llm.Message] = [
+    {"role": "user", "content": "a hint?"},
+    {"role": "assistant", "content": "What do you need to look up fast?"},
+    {"role": "user", "content": "the complement"},
+]
 
 
 @pytest.mark.parametrize(

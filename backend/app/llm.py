@@ -8,6 +8,7 @@ from typing import Literal, Protocol, TypedDict
 import anthropic
 import httpx
 from anthropic import AsyncAnthropic
+from anthropic.types import MessageParam
 
 from .core import settings
 
@@ -29,6 +30,12 @@ class LLMProvider(Protocol):
     async def complete(self, system: str, messages: list[Message]) -> str: ...
 
 
+def to_anthropic(m: Message) -> MessageParam:
+    if m["role"] == "user":
+        return {"role": "user", "content": m["content"]}
+    return {"role": "assistant", "content": m["content"]}
+
+
 class AnthropicProvider:
     def __init__(self, api_key: str, model: str) -> None:
         self.client = AsyncAnthropic(api_key=api_key)
@@ -40,7 +47,7 @@ class AnthropicProvider:
                 model=self.model,
                 max_tokens=16000,
                 system=system,
-                messages=[{"role": m["role"], "content": m["content"]} for m in messages],
+                messages=[to_anthropic(m) for m in messages],
                 cache_control={"type": "ephemeral"},
             )
         except anthropic.RateLimitError as e:
