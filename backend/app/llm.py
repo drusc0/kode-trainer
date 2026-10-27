@@ -11,6 +11,7 @@ from anthropic import AsyncAnthropic
 
 from .core import settings
 
+MAX_OUTPUT_TOKENS = 16000
 BUSY = "The assistant is busy right now. Try again in a moment."
 UNREACHABLE = "Couldn't reach the assistant. Check your internet connection."
 REFUSED = "The assistant declined to answer that. Try rephrasing."
@@ -38,7 +39,7 @@ class AnthropicProvider:
         try:
             resp = await self.client.messages.create(
                 model=self.model,
-                max_tokens=16000,
+                max_tokens=MAX_OUTPUT_TOKENS,
                 system=system,
                 messages=[{"role": m["role"], "content": m["content"]} for m in messages],
                 cache_control={"type": "ephemeral"},
@@ -57,16 +58,22 @@ class AnthropicProvider:
 class OpenAICompatibleProvider:
     """Any `/chat/completions` endpoint: OpenAI, OpenRouter, Gemini's OpenAI layer."""
 
-    def __init__(self, api_key: str, model: str, base_url: str) -> None:
+    # OpenAI's newer models reject `max_tokens`; Gemini's layer only documents it.
+    def __init__(self, api_key: str, model: str, base_url: str, cap_field: str = "max_completion_tokens") -> None:
         self.http = httpx.AsyncClient(
             base_url=base_url,
             headers={"Authorization": f"Bearer {api_key}"},
             timeout=httpx.Timeout(120.0, connect=5.0),
         )
         self.model = model
+        self.cap_field = cap_field
 
     async def complete(self, system: str, messages: list[Message]) -> str:
-        body = {"model": self.model, "messages": [{"role": "system", "content": system}, *messages]}
+        body = {
+            "model": self.model,
+            self.cap_field: MAX_OUTPUT_TOKENS,
+            "messages": [{"role": "system", "content": system}, *messages],
+        }
         try:
             resp = await self.http.post("/chat/completions", json=body)
             resp.raise_for_status()
@@ -89,8 +96,8 @@ class ProviderSpec:
     build: Callable[[str, str], LLMProvider]
 
 
-def openai_compatible(base_url: str) -> Callable[[str, str], LLMProvider]:
-    return partial(OpenAICompatibleProvider, base_url=base_url)
+def openai_compatible(base_url: str, cap_field: str = "max_completion_tokens") -> Callable[[str, str], LLMProvider]:
+    return partial(OpenAICompatibleProvider, base_url=base_url, cap_field=cap_field)
 
 
 # Adding a provider is one line. Matching takes the longest prefix, so order doesn't matter.
@@ -102,7 +109,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         "Gemini",
         "AIza",
         "gemini-2.5-flash",
-        openai_compatible("https://generativelanguage.googleapis.com/v1beta/openai"),
+        openai_compatible("https://generativelanguage.googleapis.com/v1beta/openai", cap_field="max_tokens"),
     ),
 )
 NOT_CONFIGURED = (
