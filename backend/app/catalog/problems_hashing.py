@@ -1254,6 +1254,49 @@ class NumMatrix:
             + [_region_case(r, 200, 200, 10_000)]
         ),
     ),
+    Problem(
+        slug="encode-and-decode-strings",
+        title="Encode and Decode Strings",
+        difficulty="Medium",
+        pattern="arrays-hashing",
+        topics=["Array", "String", "Design"],
+        companies=[G, M],
+        statement="Design `Codec` to turn a list of strings into one string (`encode`) and back (`decode`), as if sending it over a network.\n\nTests check that `decode(encode(strs))` equals `strs`, using a **separate** `Codec` instance for each method. Strings can contain any character — including whatever separator you have in mind.",
+        entry="Codec",
+        codec=("encode", "decode"),
+        params=[("strs", "List[str]")],
+        returns="List[str]",
+        starter="""
+class Codec:
+
+    def encode(self, strs: List[str]) -> str:
+        
+
+    def decode(self, s: str) -> List[str]:
+        
+""",
+        examples=[{"args": [["Hello", "World"]]}, {"args": [[""]]}, {"args": [[]]}, {"args": [["a#b", "4#", "", "#"]]}],
+        constraints=["0 ≤ len(strs) ≤ 200", "0 ≤ len(strs[i]) ≤ 200", "Any characters"],
+        hints=[
+            "A plain separator breaks as soon as a string contains it.",
+            "Prefix each string with its length and a delimiter, e.g. `5#Hello5#World`. The decoder reads the length, then exactly that many characters.",
+        ],
+        reference="""
+class Codec:
+    def encode(self, strs):
+        return ''.join(f'{len(s)}#{s}' for s in strs)
+    def decode(self, s):
+        out, i = [], 0
+        while i < len(s):
+            j = s.index('#', i); n = int(s[i:j])
+            out.append(s[j + 1:j + 1 + n]); i = j + 1 + n
+        return out
+""",
+        gen=lambda r: (
+            [[[word(r, r.randint(0, 8), 'ab#1,\\ é😀"') for _ in range(r.randint(0, 10))]] for _ in range(19)]
+            + [[[word(r, r.randint(0, 200), "abc#123,; ") for _ in range(200)]]]
+        ),
+    ),
 ]
 
 

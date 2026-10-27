@@ -2,7 +2,7 @@
 
 A self-hosted, LeetCode-style practice app for Python coding interviews.
 
-- **244 problems**: the ones most commonly reported in Google and Meta interviews plus the rest of the classic practice lists (Blind 75, NeetCode 150, Grind 169). 57 Easy, 160 Medium and 27 Hard across 17 patterns: arrays and hashing, two pointers, sliding window, prefix sums, stacks, binary search, linked lists, trees, heaps, graphs, backtracking, dynamic programming, intervals and greedy, design, tries, math and geometry, and bit manipulation.
+- **251 problems**: the ones most commonly reported in Google and Meta interviews plus the rest of the classic practice lists (Blind 75, NeetCode 150, Grind 169). 58 Easy, 164 Medium and 29 Hard across 17 patterns: arrays and hashing, two pointers, sliding window, prefix sums, stacks, binary search, linked lists, trees, heaps, graphs, backtracking, dynamic programming, intervals and greedy, design, tries, math and geometry, and bit manipulation.
 - **Pattern guides**: how to recognise each pattern, a Python template, complexity and common pitfalls, plus a step-by-step guide to approaching any interview question.
 - **Sessions**: each session is a clean slate with its own drafts, submissions and progress. You might keep one for Google and another for Meta.
 - **Isolated Python runner**: submissions run in a locked-down sandbox service, never in the API process.
@@ -33,7 +33,7 @@ Other commands:
 | `make logs` | Follow API and runner logs |
 | `make lint` / `make format` | ruff + mypy for the API, Biome + `tsc` for the web app ([backend/TOOLING.md](backend/TOOLING.md), [frontend/TOOLING.md](frontend/TOOLING.md)) |
 | `make test` | pytest and Vitest unit tests, no Docker needed |
-| `make test-sandbox` | Validate all 244 problems **and** a set of hostile submissions inside the real runner container |
+| `make test-sandbox` | Validate all 251 problems **and** a set of hostile submissions inside the real runner container |
 | `make dev-web` | Vite dev server on :5173 with hot reload, proxying `/api` to the dockerized API on :8000 |
 | `make down` | Stop everything (Mongo data persists in the `mongo-data` volume) |
 | `make gen-api` | Regenerate `frontend/src/api.gen.ts` after changing `backend/app/schemas.py` |
@@ -74,8 +74,10 @@ Deleting a session deletes its drafts, submissions, progress and chats.
 - **Run** executes your code on the test cases you edit in the UI. The expected output comes from running the reference solution on the same input.
 - **Submit** runs every hidden test (examples first, then generated edge cases and large inputs) and stops at the first failure.
 - Verdicts: Accepted, Wrong Answer, Time Limit Exceeded, Memory Limit Exceeded, Runtime Error, Compile Error.
-- Where several answers are valid (Two Sum, Find Peak Element, Minimum Window Substring, Longest Palindromic Substring, Minimum Remove to Make Valid Parentheses, Course Schedule II, "any order" outputs), a problem-specific checker accepts any correct answer.
+- Where several answers are valid (Two Sum, Find Peak Element, Minimum Window Substring, Longest Palindromic Substring, Minimum Remove to Make Valid Parentheses, Course Schedule II, Alien Dictionary, "any order" outputs), a problem-specific checker accepts any correct answer.
 - `ListNode` and `TreeNode` arguments use LeetCode's array format. Design problems (LRU Cache, TimeMap, Trie) use the operations/arguments format.
+- Linked List Cycle takes an extra `pos` input that links the tail back into the list; it builds the test and isn't passed to your code. Clone Graph uses an adjacency list, and Copy List with Random Pointer uses `[val, random_index]` pairs.
+- Clone and copy problems, and the `Codec` problems (Serialize and Deserialize Binary Tree, Encode and Decode Strings), fail if the result reuses any input node. Codec tests encode and decode with separate instances and compare the round trip with the input.
 
 ## Security model
 
