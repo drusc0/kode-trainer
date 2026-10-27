@@ -28,3 +28,11 @@ jobs:
       - run: make lint
       - run: make test
       - run: make check-api
+
+  images:
+    runs-on: ubuntu-latest
+    env:
+      RUNNER_TOKEN: ci-only
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker compose build api web
