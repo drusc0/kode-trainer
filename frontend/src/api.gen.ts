@@ -215,6 +215,76 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/designs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Designs */
+    get: operations["list_designs_api_designs_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/designs/{slug}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Design Detail */
+    get: operations["design_detail_api_designs__slug__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/sessions/{session_id}/designs/{slug}/draft": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Save Design Draft */
+    put: operations["save_design_draft_api_sessions__session_id__designs__slug__draft_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/sessions/{session_id}/designs/{slug}/chat": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Design Chat */
+    get: operations["get_design_chat_api_sessions__session_id__designs__slug__chat_get"];
+    put?: never;
+    /** Send Design Chat */
+    post: operations["send_design_chat_api_sessions__session_id__designs__slug__chat_post"];
+    /** Clear Design Chat */
+    delete: operations["clear_design_chat_api_sessions__session_id__designs__slug__chat_delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -278,6 +348,74 @@ export interface components {
     CodeIn: {
       /** Code */
       code: string;
+    };
+    /** DesignChatIn */
+    DesignChatIn: {
+      /** Message */
+      message: string;
+      /**
+       * Notes
+       * @default
+       */
+      notes: string;
+      /** Diagram */
+      diagram?: string | null;
+    };
+    /** DesignDetail */
+    DesignDetail: {
+      /** Slug */
+      slug: string;
+      /** Title */
+      title: string;
+      /**
+       * Difficulty
+       * @enum {string}
+       */
+      difficulty: "Easy" | "Medium" | "Hard";
+      /** Tags */
+      tags: string[];
+      /** Summary */
+      summary: string;
+      /** Prompt */
+      prompt: string;
+      /** Functional */
+      functional: string[];
+      /** Non Functional */
+      non_functional: string[];
+      /** Scale */
+      scale: string[];
+      /** Fundamentals */
+      fundamentals: string[];
+      /** Scene */
+      scene: string | null;
+      /** Notes */
+      notes: string;
+    };
+    /** DesignDraftIn */
+    DesignDraftIn: {
+      /** Scene */
+      scene: string;
+      /**
+       * Notes
+       * @default
+       */
+      notes: string;
+    };
+    /** DesignSummary */
+    DesignSummary: {
+      /** Slug */
+      slug: string;
+      /** Title */
+      title: string;
+      /**
+       * Difficulty
+       * @enum {string}
+       */
+      difficulty: "Easy" | "Medium" | "Hard";
+      /** Tags */
+      tags: string[];
+      /** Summary */
+      summary: string;
     };
     /** DifficultyBuckets */
     DifficultyBuckets: {
@@ -1147,6 +1285,191 @@ export interface operations {
     };
   };
   clear_pattern_chat_api_sessions__session_id__patterns__slug__chat_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: string;
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_designs_api_designs_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DesignSummary"][];
+        };
+      };
+    };
+  };
+  design_detail_api_designs__slug__get: {
+    parameters: {
+      query?: {
+        session_id?: string | null;
+      };
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DesignDetail"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  save_design_draft_api_sessions__session_id__designs__slug__draft_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: string;
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DesignDraftIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_design_chat_api_sessions__session_id__designs__slug__chat_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: string;
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ChatHistory"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  send_design_chat_api_sessions__session_id__designs__slug__chat_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: string;
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DesignChatIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ChatReply"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  clear_design_chat_api_sessions__session_id__designs__slug__chat_delete: {
     parameters: {
       query?: never;
       header?: never;

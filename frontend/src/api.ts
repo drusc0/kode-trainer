@@ -12,6 +12,9 @@ export type Submission = Schemas["Submission"];
 export type Bucket = Schemas["Bucket"];
 export type SessionStats = Schemas["SessionStats"];
 export type ChatMessage = Schemas["ChatMessage"];
+export type DesignSummary = Schemas["DesignSummary"];
+export type DesignDetail = Schemas["DesignDetail"];
+export type DesignChatAttachment = Omit<Schemas["DesignChatIn"], "message">;
 export type Difficulty = ProblemSummary["difficulty"];
 export type Target = Session["target"];
 export type Status = ProblemSummary["status"];
@@ -36,6 +39,7 @@ const sp = (sessionId: string, slug: string) => `/sessions/${sessionId}/problems
 
 export const problemChatPath = (sessionId: string, slug: string) => `${sp(sessionId, slug)}/chat`;
 export const patternChatPath = (sessionId: string, slug: string) => `/sessions/${sessionId}/patterns/${slug}/chat`;
+export const designChatPath = (sessionId: string, slug: string) => `/sessions/${sessionId}/designs/${slug}/chat`;
 
 export const api = {
   problems: (sessionId?: string | null) => req<Schemas["ProblemList"]>(`/problems${q(sessionId)}`),
@@ -61,12 +65,14 @@ export const api = {
     req<SubmitResult>(`${sp(sessionId, slug)}/submit`, { method: "POST", body: JSON.stringify({ code }) }),
   submissions: (sessionId: string, slug: string) => req<Submission[]>(`${sp(sessionId, slug)}/submissions`),
   chat: (path: string) => req<Schemas["ChatHistory"]>(path),
-  sendChat: (path: string, message: string, code = "") =>
-    req<Schemas["ChatReply"]>(path, {
-      method: "POST",
-      body: JSON.stringify({ message, code } satisfies Schemas["ChatIn"]),
-    }),
+  sendChat: (path: string, body: Schemas["ChatIn"] | Schemas["DesignChatIn"]) =>
+    req<Schemas["ChatReply"]>(path, { method: "POST", body: JSON.stringify(body) }),
   clearChat: (path: string) => req<void>(path, { method: "DELETE" }),
+
+  designs: () => req<DesignSummary[]>("/designs"),
+  design: (slug: string, sessionId?: string | null) => req<DesignDetail>(`/designs/${slug}${q(sessionId)}`),
+  saveDesignDraft: (sessionId: string, slug: string, body: Schemas["DesignDraftIn"]) =>
+    req<void>(`/sessions/${sessionId}/designs/${slug}/draft`, { method: "PUT", body: JSON.stringify(body) }),
 };
 
 export function timeAgo(iso: string | null): string {

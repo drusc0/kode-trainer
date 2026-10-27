@@ -178,9 +178,39 @@ class ChatIn(BaseModel):
     code: str = Field(default="", max_length=settings.max_code_bytes)
 
 
+class DesignChatIn(BaseModel):
+    message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
+    notes: str = Field(default="", max_length=20000)
+    diagram: str | None = Field(default=None, max_length=settings.max_diagram_b64, pattern=r"^[A-Za-z0-9+/]+={0,2}$")
+
+
 class ChatHistory(BaseModel):
     messages: list[ChatMessage]
 
 
 class ChatReply(BaseModel):
     message: ChatMessage
+
+
+# ---------------------------------------------------------------- system design
+class DesignSummary(BaseModel):
+    slug: str
+    title: str
+    difficulty: Difficulty
+    tags: list[str]
+    summary: str
+
+
+class DesignDetail(DesignSummary):
+    prompt: str
+    functional: list[str]
+    non_functional: list[str]
+    scale: list[str]
+    fundamentals: list[str]
+    scene: str | None
+    notes: str
+
+
+class DesignDraftIn(BaseModel):
+    scene: str = Field(max_length=settings.max_scene_bytes)
+    notes: str = Field(default="", max_length=20000)

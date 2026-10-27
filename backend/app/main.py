@@ -13,12 +13,18 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from . import chat, judge, llm
 from .catalog import BY_SLUG, PATTERNS, PROBLEMS, Problem
 from .core import Doc, RunnerError, db, ensure_indexes, now, settings
+from .designs import BY_SLUG as DESIGNS_BY_SLUG
+from .designs import DESIGNS, Design
 from .schemas import (
     ChatHistory,
     ChatIn,
     ChatMessage,
     ChatReply,
     CodeIn,
+    DesignChatIn,
+    DesignDetail,
+    DesignDraftIn,
+    DesignSummary,
     Example,
     Health,
     ProblemDetail,
@@ -189,7 +195,7 @@ async def update_session(session_id: str, body: SessionPatch) -> Doc:
 @app.delete("/api/sessions/{session_id}", status_code=204)
 async def delete_session(session_id: str) -> None:
     s = await get_session(session_id)
-    for coll in ("submissions", "drafts", "progress", "chats", "pattern_chats"):
+    for coll in ("submissions", "drafts", "progress", "chats", "pattern_chats", "design_drafts", "design_chats"):
         await db()[coll].delete_many({"session_id": session_id})
     await db().sessions.delete_one({"_id": s["_id"]})
 
@@ -336,17 +342,19 @@ async def load_chat(coll: str, key: Doc) -> Doc:
     return {"messages": doc["messages"] if doc else []}
 
 
-async def chat_turn(provider: llm.LLMProvider, coll: str, key: Doc, system: str, body: ChatIn) -> Doc:
+async def chat_turn(
+    provider: llm.LLMProvider, coll: str, key: Doc, system: str, message: str, turn: str, image: str | None = None
+) -> Doc:
     history = [ChatMessage(**m) for m in (await load_chat(coll, key))["messages"]]
     try:
-        text = await chat.reply(provider, system, history, chat.user_turn(body.message, body.code))
+        text = await chat.reply(provider, system, history, turn, image)
     except llm.ChatError as e:
         raise HTTPException(502, str(e)) from e
     answer = ChatMessage(role="assistant", content=text)
     await db()[coll].update_one(
         key,
         {
-            "$push": {"messages": {"$each": [{"role": "user", "content": body.message}, answer.model_dump()]}},
+            "$push": {"messages": {"$each": [{"role": "user", "content": message}, answer.model_dump()]}},
             "$set": {"updated_at": now()},
         },
         upsert=True,
@@ -367,7 +375,8 @@ async def send_chat(session_id: str, slug: str, body: ChatIn) -> Doc:
     await get_session(session_id)
     p = get_problem(slug)
     system = chat.build_system_prompt(p, await example_views(p))
-    return await chat_turn(provider, "chats", {"session_id": session_id, "problem": slug}, system, body)
+    turn = chat.user_turn(body.message, body.code)
+    return await chat_turn(provider, "chats", {"session_id": session_id, "problem": slug}, system, body.message, turn)
 
 
 @app.delete("/api/sessions/{session_id}/problems/{slug}/chat", status_code=204)
@@ -388,9 +397,74 @@ async def send_pattern_chat(session_id: str, slug: str, body: ChatIn) -> Doc:
     get_pattern(slug)
     await get_session(session_id)
     system = chat.build_pattern_prompt(slug, [p for p in PROBLEMS if p.pattern == slug])
-    return await chat_turn(provider, "pattern_chats", {"session_id": session_id, "pattern": slug}, system, body)
+    turn = chat.user_turn(body.message, body.code)
+    key = {"session_id": session_id, "pattern": slug}
+    return await chat_turn(provider, "pattern_chats", key, system, body.message, turn)
 
 
 @app.delete("/api/sessions/{session_id}/patterns/{slug}/chat", status_code=204)
 async def clear_pattern_chat(session_id: str, slug: str) -> None:
     await db().pattern_chats.delete_one({"session_id": session_id, "pattern": slug})
+
+
+# ---------------------------------------------------------------- system design
+def get_design(slug: str) -> Design:
+    if slug not in DESIGNS_BY_SLUG:
+        raise HTTPException(404, "Design question not found")
+    return DESIGNS_BY_SLUG[slug]
+
+
+def design_summary(d: Design) -> Doc:
+    return {"slug": d.slug, "title": d.title, "difficulty": d.difficulty, "tags": d.tags, "summary": d.summary}
+
+
+@app.get("/api/designs", response_model=list[DesignSummary])
+async def list_designs() -> list[Doc]:
+    return [design_summary(d) for d in DESIGNS]
+
+
+@app.get("/api/designs/{slug}", response_model=DesignDetail)
+async def design_detail(slug: str, session_id: str | None = None) -> Doc:
+    d = get_design(slug)
+    draft = await db().design_drafts.find_one({"session_id": session_id, "design": slug}) if session_id else None
+    return {
+        **design_summary(d),
+        "prompt": d.prompt,
+        "functional": d.functional,
+        "non_functional": d.non_functional,
+        "scale": d.scale,
+        "fundamentals": d.fundamentals,
+        "scene": draft["scene"] if draft else None,
+        "notes": draft.get("notes", "") if draft else "",
+    }
+
+
+@app.put("/api/sessions/{session_id}/designs/{slug}/draft", status_code=204)
+async def save_design_draft(session_id: str, slug: str, body: DesignDraftIn) -> None:
+    get_design(slug)
+    await get_session(session_id)
+    await db().design_drafts.update_one(
+        {"session_id": session_id, "design": slug}, {"$set": {**body.model_dump(), "updated_at": now()}}, upsert=True
+    )
+
+
+@app.get("/api/sessions/{session_id}/designs/{slug}/chat", response_model=ChatHistory)
+async def get_design_chat(session_id: str, slug: str) -> Doc:
+    get_design(slug)
+    await get_session(session_id)
+    return await load_chat("design_chats", {"session_id": session_id, "design": slug})
+
+
+@app.post("/api/sessions/{session_id}/designs/{slug}/chat", response_model=ChatReply)
+async def send_design_chat(session_id: str, slug: str, body: DesignChatIn) -> Doc:
+    provider = require_chat()
+    d = get_design(slug)
+    await get_session(session_id)
+    turn = chat.design_turn(body.message, body.notes)
+    key = {"session_id": session_id, "design": slug}
+    return await chat_turn(provider, "design_chats", key, chat.build_design_prompt(d), body.message, turn, body.diagram)
+
+
+@app.delete("/api/sessions/{session_id}/designs/{slug}/chat", status_code=204)
+async def clear_design_chat(session_id: str, slug: str) -> None:
+    await db().design_chats.delete_one({"session_id": session_id, "design": slug})

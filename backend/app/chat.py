@@ -1,6 +1,7 @@
 """The problem chat assistant: a Socratic interview colleague backed by the configured LLM."""
 
 from .catalog.base import Problem
+from .designs import Design
 from .llm import ChatError, LLMProvider, Message
 from .schemas import ChatMessage, Example
 
@@ -51,6 +52,36 @@ encourage the user to solve them in the workspace.
 - Keep replies focused: a short answer for a short question, in Markdown."""
 
 
+INTERVIEWER = """\
+You are a senior staff engineer running a system design interview. The user is practising for real \
+interviews and wants honest, specific feedback and the kind of deep-dive follow-ups a strong \
+interviewer asks.
+
+Their whiteboard is an Excalidraw drawing. When they share it, it arrives as an image with their \
+current turn, along with their written notes inside <my_notes>. Read the diagram carefully: name the \
+components and arrows you see, and say so when something is ambiguous or unreadable rather than \
+guessing.
+
+How to run the session:
+- When they ask for a review, first restate the design you see in two or three sentences so they can \
+correct you, then give feedback in order of impact: what works, what is missing or wrong against the \
+requirements, and the risks at the stated scale.
+- Drive deep dives like an interviewer: ask ONE pointed follow-up question at a time and wait for the \
+answer. Push on bottlenecks, failure modes, data models, consistency, numbers and trade-offs. Use the \
+deep-dive topics below as your guide, and prefer the ones their design hasn't addressed yet.
+- When they answer, say what was right, then challenge anything vague ("what happens when that node \
+dies?", "how many machines is that?"). Ask for numbers when they hand-wave scale.
+- Don't hand them the answer. If they're stuck, give a nudge (a question or a hint at the concept), and \
+explain fully only if they ask.
+- There's rarely one right design. Accept reasonable alternatives that meet the requirements and \
+discuss their trade-offs instead of steering toward one canonical solution.
+- When they ask to be graded, score these out of 4 with one line of evidence each: requirements and \
+scoping, high-level design, deep dives, trade-offs and communication. Then give a hire / lean hire / \
+lean no hire / no hire signal for the level they mention (default senior) and the top three things to \
+improve.
+- Keep replies short and conversational, in Markdown. Small ASCII diagrams in ```text blocks are fine."""
+
+
 def build_system_prompt(p: Problem, examples: list[Example]) -> str:
     names = [n for n, _ in p.params]
     lines = []
@@ -96,15 +127,50 @@ The user is reading the guide for this pattern and wants to understand it better
 </practice_problems>"""
 
 
+def build_design_prompt(d: Design) -> str:
+    def bullets(items: list[str]) -> str:
+        return "\n".join(f"- {i}" for i in items)
+
+    return f"""{INTERVIEWER}
+
+<question title="{d.title}" difficulty="{d.difficulty}">
+{d.prompt}
+
+Functional requirements:
+{bullets(d.functional)}
+
+Non-functional requirements:
+{bullets(d.non_functional)}
+
+Scale:
+{bullets(d.scale)}
+</question>
+
+<deep_dive_topics hidden="true">
+{bullets(d.rubric)}
+</deep_dive_topics>"""
+
+
+def design_turn(message: str, notes: str) -> str:
+    if not notes.strip():
+        return message
+    return f"<my_notes>\n{notes.rstrip()}\n</my_notes>\n\n{message}"
+
+
 def user_turn(message: str, code: str) -> str:
     if not code.strip():
         return message
     return f"<my_current_code>\n```python\n{code.rstrip()}\n```\n</my_current_code>\n\n{message}"
 
 
-async def reply(provider: LLMProvider, system: str, history: list[ChatMessage], turn: str) -> str:
+async def reply(
+    provider: LLMProvider, system: str, history: list[ChatMessage], turn: str, image: str | None = None
+) -> str:
     messages: list[Message] = [{"role": m.role, "content": m.content} for m in history[-HISTORY_LIMIT:]]
-    messages.append({"role": "user", "content": turn})
+    current: Message = {"role": "user", "content": turn}
+    if image:
+        current["image"] = image
+    messages.append(current)
     text = await provider.complete(system, messages)
     if not text.strip():
         raise ChatError("The assistant returned an empty reply. Try again.")

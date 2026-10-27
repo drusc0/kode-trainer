@@ -1,6 +1,8 @@
 import { lazy, Suspense } from "react";
 import { Navigate, NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { TARGET_LABEL } from "./api";
+import DesignsPage from "./pages/DesignsPage";
+import FundamentalPage from "./pages/FundamentalPage";
 import PatternPage from "./pages/PatternPage";
 import PatternsPage from "./pages/PatternsPage";
 import ProblemsPage from "./pages/ProblemsPage";
@@ -9,6 +11,8 @@ import { ThemeContext, useSession, useTheme } from "./session";
 
 // Monaco (~2.3 MB) is only needed on the workspace, so keep it out of the entry chunk.
 const WorkspacePage = lazy(() => import("./pages/WorkspacePage"));
+// Same for Excalidraw on the system design whiteboard.
+const DesignWorkspacePage = lazy(() => import("./pages/DesignWorkspacePage"));
 
 const loadingPage = (
   <main className="page">
@@ -35,6 +39,7 @@ export default function App() {
         <nav className="mainnav">
           <NavLink to="/problems">Problems</NavLink>
           <NavLink to="/patterns">Patterns</NavLink>
+          <NavLink to="/design">System design</NavLink>
           <NavLink to="/sessions">Sessions</NavLink>
         </nav>
         <div className="grow" />
@@ -81,6 +86,9 @@ export default function App() {
             <Route path="/problems/:slug" element={<WorkspacePage key={current.id} />} />
             <Route path="/patterns" element={<PatternsPage />} />
             <Route path="/patterns/:slug" element={<PatternPage />} />
+            <Route path="/design" element={<DesignsPage />} />
+            <Route path="/design/learn/:slug" element={<FundamentalPage />} />
+            <Route path="/design/:slug" element={<DesignWorkspacePage key={current.id} />} />
             <Route path="/sessions" element={<SessionsPage />} />
             <Route
               path="*"

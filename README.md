@@ -4,6 +4,7 @@ A self-hosted, LeetCode-style practice app for Python coding interviews.
 
 - **251 problems**: the ones most commonly reported in Google and Meta interviews plus the rest of the classic practice lists (Blind 75, NeetCode 150, Grind 169). 58 Easy, 164 Medium and 29 Hard across 17 patterns: arrays and hashing, two pointers, sliding window, prefix sums, stacks, binary search, linked lists, trees, heaps, graphs, backtracking, dynamic programming, intervals and greedy, design, tries, math and geometry, and bit manipulation.
 - **Pattern guides**: how to recognise each pattern, a Python template, complexity and common pitfalls, plus a step-by-step guide to approaching any interview question.
+- **System design**: 17 design questions (URL shortener, rate limiter, chat, ride-sharing, Kafka, payments, …), 11 fundamentals guides to prep with, an Excalidraw whiteboard that works with an Apple Pencil, and an AI interviewer that reviews your diagram and runs deep-dive follow-ups.
 - **Sessions**: each session is a clean slate with its own drafts, submissions and progress. You might keep one for Google and another for Meta.
 - **Isolated Python runner**: submissions run in a locked-down sandbox service, never in the API process.
 
@@ -45,6 +46,12 @@ The workspace has a **Chat** tab: a colleague powered by the LLM of your choice 
 
 It needs `LLM_API_KEY` in `.env`; the key's prefix picks the provider (`sk-ant-` Anthropic, `sk-or-` OpenRouter, `sk-` OpenAI, `AIza` Gemini; see `backend/app/llm.py`). `CHAT_MODEL` picks the model (defaults: `claude-sonnet-5`, `gpt-5`, `gemini-2.5-flash`, `openai/gpt-5`). Without a key everything else works and the tab explains how to turn it on.
 
+### System design
+
+The **System design** tab has prep guides (estimation, caching, databases, sharding, consistency, Kafka, streaming, storage, search and geo, reliability) and 17 questions. Each question opens a whiteboard: draw on the Excalidraw canvas, keep requirements and estimates in the notes, and ask the **Interviewer**. Every message sends a PNG of the current whiteboard plus your notes; the interviewer also sees a hidden list of deep-dive topics for the question, so it can probe what you haven't covered. Drawings autosave per session.
+
+To draw on an iPad, serve the app on your LAN: set `WEB_BIND=0.0.0.0` and add your Mac's hostname or IP to `ALLOWED_HOSTS` in `.env`, run `make up`, then open `http://<your-mac>:8080` on the iPad. The API has no authentication, so only do this on a network you trust.
+
 ### API types
 
 `backend/app/schemas.py` is the single source of truth for request and response shapes. FastAPI publishes them as OpenAPI, and `make gen-api` turns that into TypeScript for the frontend, so `frontend/src/api.ts` only aliases the generated types.
@@ -66,8 +73,9 @@ It needs `LLM_API_KEY` in `.env`; the key's prefix picks the provider (`sk-ant-`
 - `progress`: one per `(session_id, problem)`: attempts, solved, first solve time, best runtime
 - `problem_tests`: hidden tests and expected outputs, keyed by problem with a fingerprint
 - `chats`: one per `(session_id, problem)`; the chat assistant conversation
+- `design_drafts` / `design_chats`: one per `(session_id, design)`; the whiteboard scene and notes, and the interviewer conversation
 
-Deleting a session deletes its drafts, submissions, progress and chats.
+Deleting a session deletes its drafts, submissions, progress, chats and design work.
 
 ### Judging
 
