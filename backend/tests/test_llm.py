@@ -67,6 +67,7 @@ def test_anthropic_sends_system_and_messages() -> None:
     assert calls[0]["model"] == "claude-sonnet-5"
     assert calls[0]["system"] == "SYSTEM"
     assert calls[0]["messages"] == MESSAGES
+    assert calls[0]["max_tokens"] == llm.MAX_OUTPUT_TOKENS
 
 
 def test_anthropic_refusal_raises_chat_error() -> None:
@@ -98,6 +99,15 @@ def test_openai_compatible_puts_system_first_and_returns_content() -> None:
     body = json.loads(sent[0].content)
     assert body["model"] == "gpt-5"
     assert body["messages"] == [{"role": "system", "content": "SYSTEM"}, *MESSAGES]
+    assert body["max_completion_tokens"] == llm.MAX_OUTPUT_TOKENS
+
+
+@pytest.mark.parametrize(
+    ("key", "field"),
+    [("sk-x", "max_completion_tokens"), ("sk-or-v1-x", "max_completion_tokens"), ("AIza-x", "max_tokens")],
+)
+def test_openai_compatible_caps_output_with_the_field_each_provider_accepts(key: str, field: str) -> None:
+    assert cast(llm.OpenAICompatibleProvider, llm.create_provider(key)).cap_field == field
 
 
 @pytest.mark.parametrize(
