@@ -48,7 +48,8 @@ services:
     build: ./frontend
     restart: unless-stopped
     depends_on: [api]
-    ports: ["127.0.0.1:8080:80"]
+    # Set WEB_BIND=0.0.0.0 (plus your Mac's hostname/IP in ALLOWED_HOSTS) to draw on an iPad over your LAN.
+    ports: ["${WEB_BIND:-127.0.0.1}:8080:80"]
     networks: [backend]
 
 networks:

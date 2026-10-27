@@ -24,6 +24,8 @@ class Settings:
     )
     max_code_bytes: int = 64 * 1024
     max_custom_cases: int = 10
+    max_scene_bytes: int = 4 * 1024 * 1024
+    max_diagram_b64: int = 7 * 1024 * 1024  # ~5 MB PNG, Claude's per-image limit
     # Anthropic, OpenAI, Gemini or OpenRouter: the key's prefix picks the provider (app/llm.py).
     llm_api_key: str = os.environ.get("LLM_API_KEY", "")
     chat_model: str = os.environ.get("CHAT_MODEL", "")  # empty = the provider's default
@@ -48,6 +50,8 @@ async def ensure_indexes() -> None:
     await d.drafts.create_index([("session_id", 1), ("problem", 1)], unique=True)
     await d.chats.create_index([("session_id", 1), ("problem", 1)], unique=True)
     await d.pattern_chats.create_index([("session_id", 1), ("pattern", 1)], unique=True)
+    await d.design_drafts.create_index([("session_id", 1), ("design", 1)], unique=True)
+    await d.design_chats.create_index([("session_id", 1), ("design", 1)], unique=True)
 
 
 def now() -> datetime:

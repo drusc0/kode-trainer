@@ -7,6 +7,7 @@ from app import chat, judge, llm
 from app.catalog import BY_SLUG, PROBLEMS
 from app.catalog.base import Problem
 from app.core import settings
+from app.designs import BY_SLUG as DESIGNS_BY_SLUG
 from app.main import app
 from app.schemas import ChatMessage, Example
 
@@ -121,3 +122,50 @@ def test_unknown_pattern_chat_returns_404(monkeypatch: pytest.MonkeyPatch) -> No
     url = PATTERN_CHAT_URL.replace("sliding-window", "nope")
     resp = TestClient(app, base_url="http://localhost").post(url, json={"message": "hi"})
     assert resp.status_code == 404
+
+
+DESIGN_CHAT_URL = "/api/sessions/000000000000000000000000/designs/url-shortener/chat"
+
+
+def test_design_prompt_carries_question_and_hidden_rubric() -> None:
+    d = DESIGNS_BY_SLUG["url-shortener"]
+    prompt = chat.build_design_prompt(d)
+    assert prompt.startswith(chat.INTERVIEWER)
+    assert d.prompt in prompt
+    assert all(r in prompt for r in d.functional + d.non_functional + d.scale + d.rubric)
+    assert '<deep_dive_topics hidden="true">' in prompt
+
+
+def test_design_turn_puts_notes_before_the_message() -> None:
+    assert (
+        chat.design_turn("review my design", "QPS ~ 40k\n") == "<my_notes>\nQPS ~ 40k\n</my_notes>\n\nreview my design"
+    )
+    assert chat.design_turn("hi", "  ") == "hi"
+
+
+def test_reply_attaches_the_diagram_to_the_current_turn_only() -> None:
+    provider = FakeProvider("Looks good.")
+    history = [ChatMessage(role="user", content="earlier"), ChatMessage(role="assistant", content="ok")]
+    asyncio.run(chat.reply(provider, "S", history, "review", "iVBORw0KGgo="))
+    _, messages = provider.calls[0]
+    assert messages[:2] == [{"role": "user", "content": "earlier"}, {"role": "assistant", "content": "ok"}]
+    assert messages[2] == {"role": "user", "content": "review", "image": "iVBORw0KGgo="}
+
+
+def test_design_chat_without_key_returns_503(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "llm_api_key", "")
+    resp = TestClient(app, base_url="http://localhost").post(DESIGN_CHAT_URL, json={"message": "review"})
+    assert resp.status_code == 503
+
+
+@pytest.mark.parametrize("diagram", ["not base64!", "<svg/>"])
+def test_design_chat_rejects_non_base64_diagram(monkeypatch: pytest.MonkeyPatch, diagram: str) -> None:
+    monkeypatch.setattr(settings, "llm_api_key", "sk-ant-test")
+    body = {"message": "review", "diagram": diagram}
+    assert TestClient(app, base_url="http://localhost").post(DESIGN_CHAT_URL, json=body).status_code == 422
+
+
+def test_unknown_design_chat_returns_404(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "llm_api_key", "sk-ant-test")
+    url = DESIGN_CHAT_URL.replace("url-shortener", "nope")
+    assert TestClient(app, base_url="http://localhost").post(url, json={"message": "hi"}).status_code == 404

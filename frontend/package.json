@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "0.18.1",
     "@monaco-editor/react": "^4.7.0",
     "monaco-editor": "^0.57.0",
     "react": "^19.3.1",

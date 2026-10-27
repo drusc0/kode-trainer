@@ -1238,3 +1238,48 @@ button.chip {
 .mentor .md {
   font-size: 14px;
 }
+
+/* ---------------------------------------------------------------- system design whiteboard */
+.design-ws {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 8px;
+  height: calc(100vh - 54px - env(safe-area-inset-top, 0px));
+  padding: 8px;
+}
+.design-ws.side-closed {
+  grid-template-columns: 1fr;
+}
+.design-side[hidden] {
+  display: none;
+}
+.design-canvas {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  /* Keeps Apple Pencil strokes from scrolling or zooming the page. */
+  touch-action: none;
+}
+.side-toggle {
+  position: absolute;
+  bottom: 72px;
+  right: 12px;
+  z-index: 5;
+  background: var(--panel);
+}
+.design-notes {
+  min-height: 160px;
+}
+@media (max-width: 900px) {
+  .design-ws {
+    grid-template-columns: 1fr;
+    grid-template-rows: 65vh auto;
+    height: auto;
+  }
+  .design-side {
+    max-height: 80vh;
+  }
+}

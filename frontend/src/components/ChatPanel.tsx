@@ -1,11 +1,12 @@
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
-import { api, type ChatMessage } from "../api";
+import { api, type ChatMessage, type DesignChatAttachment } from "../api";
 import Markdown from "./Markdown";
 
 // Stays mounted while hidden so an in-flight reply (or its error and the restored draft) survives tab switches.
 export default function ChatPanel({
   path,
   code = "",
+  attach,
   hidden = false,
   intro,
   placeholder,
@@ -13,6 +14,8 @@ export default function ChatPanel({
 }: {
   path: string;
   code?: string;
+  // Replaces `code`: builds the context sent with each message (e.g. the whiteboard image and notes).
+  attach?: () => Promise<DesignChatAttachment>;
   hidden?: boolean;
   intro: string;
   placeholder: string;
@@ -54,7 +57,7 @@ export default function ChatPanel({
     setDraft("");
     setMessages((m) => [...(m ?? []), { role: "user", content: text }]);
     try {
-      const { message } = await api.sendChat(path, text, code);
+      const { message } = await api.sendChat(path, { message: text, ...(attach ? await attach() : { code }) });
       setMessages((m) => [...(m ?? []), message]);
     } catch (e) {
       setMessages((m) => (m ?? []).slice(0, -1));
