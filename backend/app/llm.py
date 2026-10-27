@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cache, partial
-from typing import Literal, Protocol, TypedDict
+from typing import Any, Literal, NotRequired, Protocol, TypedDict
 
 import anthropic
 import httpx
@@ -25,6 +25,7 @@ class ChatError(RuntimeError):
 class Message(TypedDict):
     role: Literal["user", "assistant"]
     content: str
+    image: NotRequired[str]  # base64 PNG shown before the text, user turns only
 
 
 class LLMProvider(Protocol):
@@ -32,9 +33,29 @@ class LLMProvider(Protocol):
 
 
 def to_anthropic(m: Message) -> MessageParam:
-    if m["role"] == "user":
+    if m["role"] == "assistant":
+        return {"role": "assistant", "content": m["content"]}
+    if "image" not in m:
         return {"role": "user", "content": m["content"]}
-    return {"role": "assistant", "content": m["content"]}
+    return {
+        "role": "user",
+        "content": [
+            {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": m["image"]}},
+            {"type": "text", "text": m["content"]},
+        ],
+    }
+
+
+def to_openai(m: Message) -> dict[str, Any]:
+    if "image" not in m:
+        return {"role": m["role"], "content": m["content"]}
+    return {
+        "role": m["role"],
+        "content": [
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{m['image']}"}},
+            {"type": "text", "text": m["content"]},
+        ],
+    }
 
 
 class AnthropicProvider:
@@ -79,7 +100,7 @@ class OpenAICompatibleProvider:
         body = {
             "model": self.model,
             self.cap_field: MAX_OUTPUT_TOKENS,
-            "messages": [{"role": "system", "content": system}, *messages],
+            "messages": [{"role": "system", "content": system}, *map(to_openai, messages)],
         }
         try:
             resp = await self.http.post("/chat/completions", json=body)

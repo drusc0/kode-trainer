@@ -76,6 +76,18 @@ def test_anthropic_refusal_raises_chat_error() -> None:
         asyncio.run(provider.complete("S", MESSAGES))
 
 
+def test_messages_with_an_image_send_it_before_the_text() -> None:
+    m: llm.Message = {"role": "user", "content": "review", "image": "iVBORw0KGgo="}
+    assert llm.to_anthropic(m)["content"] == [
+        {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "iVBORw0KGgo="}},
+        {"type": "text", "text": "review"},
+    ]
+    assert llm.to_openai(m)["content"] == [
+        {"type": "image_url", "image_url": {"url": "data:image/png;base64,iVBORw0KGgo="}},
+        {"type": "text", "text": "review"},
+    ]
+
+
 def openai_provider(handler: Any) -> llm.OpenAICompatibleProvider:
     provider = llm.OpenAICompatibleProvider("sk-x", "gpt-5", "https://api.example.com/v1")
     provider.http = httpx.AsyncClient(base_url="https://api.example.com/v1", transport=httpx.MockTransport(handler))
