@@ -112,6 +112,8 @@ NOT_CONFIGURED = (
 )
 
 
+# Cached per (key, model) so each provider's HTTP client is built once and reused.
+@cache
 def create_provider(api_key: str, model: str = "") -> LLMProvider:
     matches = [s for s in PROVIDERS if api_key.startswith(s.key_prefix)]
     if not matches:
@@ -120,6 +122,5 @@ def create_provider(api_key: str, model: str = "") -> LLMProvider:
     return spec.build(api_key, model or spec.default_model)
 
 
-@cache
 def provider() -> LLMProvider:
     return create_provider(settings.llm_api_key, settings.chat_model)

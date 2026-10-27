@@ -39,3 +39,4 @@ gen-api:       ## regenerate frontend/src/api.gen.ts from the FastAPI models (ba
 check-api:     ## fail if api.gen.ts is stale
 	$(MAKE) gen-api
 	git diff --exit-code frontend/src/api.gen.ts
+	git diff --exit-code frontend/src/api.gen.ts

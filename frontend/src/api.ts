@@ -34,6 +34,9 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 const q = (sessionId?: string | null) => (sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "");
 const sp = (sessionId: string, slug: string) => `/sessions/${sessionId}/problems/${slug}`;
 
+export const problemChatPath = (sessionId: string, slug: string) => `${sp(sessionId, slug)}/chat`;
+export const patternChatPath = (sessionId: string, slug: string) => `/sessions/${sessionId}/patterns/${slug}/chat`;
+
 export const api = {
   problems: (sessionId?: string | null) => req<Schemas["ProblemList"]>(`/problems${q(sessionId)}`),
   problem: (slug: string, sessionId?: string | null) => req<ProblemDetail>(`/problems/${slug}${q(sessionId)}`),
@@ -57,13 +60,13 @@ export const api = {
   submit: (sessionId: string, slug: string, code: string) =>
     req<SubmitResult>(`${sp(sessionId, slug)}/submit`, { method: "POST", body: JSON.stringify({ code }) }),
   submissions: (sessionId: string, slug: string) => req<Submission[]>(`${sp(sessionId, slug)}/submissions`),
-  chat: (sessionId: string, slug: string) => req<Schemas["ChatHistory"]>(`${sp(sessionId, slug)}/chat`),
-  sendChat: (sessionId: string, slug: string, message: string, code: string) =>
-    req<Schemas["ChatReply"]>(`${sp(sessionId, slug)}/chat`, {
+  chat: (path: string) => req<Schemas["ChatHistory"]>(path),
+  sendChat: (path: string, message: string, code = "") =>
+    req<Schemas["ChatReply"]>(path, {
       method: "POST",
       body: JSON.stringify({ message, code } satisfies Schemas["ChatIn"]),
     }),
-  clearChat: (sessionId: string, slug: string) => req<void>(`${sp(sessionId, slug)}/chat`, { method: "DELETE" }),
+  clearChat: (path: string) => req<void>(path, { method: "DELETE" }),
 };
 
 export function timeAgo(iso: string | null): string {

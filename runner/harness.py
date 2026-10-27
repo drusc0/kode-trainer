@@ -360,6 +360,14 @@ def check(mode: str, out: Any, exp: Any, args: Any) -> bool:
         if mode == "min_remove_parens":
             s = args[0]
             return isinstance(out, str) and len(out) == len(exp) and is_valid_parens(out) and is_subsequence(out, s)
+        if mode == "topo_order":
+            n, prereqs = args
+            if exp == []:
+                return isinstance(out, list) and not out
+            if not isinstance(out, list) or not all(type(c) is int for c in out) or sorted(out) != list(range(n)):
+                return False
+            pos = {c: i for i, c in enumerate(out)}
+            return all(pos[before] < pos[after] for after, before in prereqs)
         return strict_equal(out, exp)
     except Exception:
         return False

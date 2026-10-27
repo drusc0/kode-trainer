@@ -1,15 +1,54 @@
-## Recognise it
+## The idea in plain words
 
-"Number of ways", "minimum / maximum cost", "is it possible", where the answer depends on answers to smaller versions of the same question.
+Dynamic programming means **"don't solve the same small problem twice; write the answer down."**
 
-## Four steps
+Climbing stairs: you can take 1 or 2 steps at a time. How many ways are there to reach step 10? Your **last move** was either from step 9 or from step 8, so:
 
-1. **State:** what does `dp[i]` (or `dp[i][j]`) mean, in words?
-2. **Transition:** how is it built from smaller states?
-3. **Base cases.**
-4. **Order:** fill states so dependencies are ready — or memoize top-down with `@cache`.
+`ways(10) = ways(9) + ways(8)`
 
-## Templates
+The big answer is built from smaller answers. Plain recursion would recompute `ways(5)` dozens of times; DP computes it once and stores it in a table, like filling in a **spreadsheet** where each cell is calculated from cells you've already filled.
+
+## You'll know it's this pattern when…
+
+- The question asks for the **number of ways**, the **minimum / maximum cost**, or **whether it's possible**.
+- You make a **choice at each step** (take or skip, which coin, which edit).
+- A brute-force recursion tree would hit the same sub-question many times.
+
+## Picture it
+
+Climbing stairs: each cell is the sum of the two before it.
+
+```text
+step:   0   1   2   3   4   5
+ways:   1   1   2   3   5   8
+                ↑
+          ways[2] = ways[1] + ways[0]
+```
+
+House robber with `[2, 7, 9, 3, 1]`. For each house: rob it (best from two houses back + this one) or skip it (best so far):
+
+```text
+house:    2    7    9     3     1
+best:     2    7   11    11    12
+               ↑    ↑
+       max(2, 7)   max(7, 2 + 9)
+```
+
+## Walk through an example
+
+Every DP problem follows four steps. Here they are for Coin Change, `coins = [1, 2, 5]`, `amount = 11`:
+
+1. **State:** `dp[x]` = the fewest coins that make amount `x`.
+2. **Transition:** the last coin was some `c`, so `dp[x] = 1 + min(dp[x - c])` over all coins.
+3. **Base case:** `dp[0] = 0` (zero coins make zero).
+4. **Order:** fill `x = 1, 2, …, 11` so the smaller amounts are ready first.
+
+```text
+x:    0  1  2  3  4  5  6  7  8  9  10  11
+dp:   0  1  1  2  2  1  2  2  3  3   2   3     → 11 = 5 + 5 + 1
+```
+
+## The code
 
 ```python
 # 1-D: House Robber — best[i] = max(skip i, take i)
@@ -30,7 +69,9 @@ for x in range(1, amount + 1):
 # otherwise   -> 1 + min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1])
 ```
 
-## Common state shapes
+Prefer to think top-down? Write the plain recursion and add `@cache` above it. That's DP too (memoization).
+
+### Common state shapes
 
 | Shape | Examples |
 |---|---|
@@ -40,8 +81,13 @@ for x in range(1, amount + 1):
 | interval `dp[l][r]` | Longest Palindromic Substring |
 | LIS | O(n²) dp, or O(n log n) patience sorting with `bisect` |
 
-## Pitfalls
+## How fast is it?
 
-- Say what the state means out loud before writing code. Most DP bugs are unclear states.
+(number of states) × (work per state). Coin Change is `amount × len(coins)`, and Edit Distance is `len(a) × len(b)`.
+
+## Common mistakes
+
+- Say what the state means **in words** before writing code. Most DP bugs come from a fuzzy state.
+- Off-by-one in base cases: what's the answer for 0, or for an empty string?
 - Rolling arrays reduce space from O(n²) to O(n). Mention it after you have a working solution.
 - Decode Ways: `"0"` can't stand alone, and `"06"` isn't a valid pair.

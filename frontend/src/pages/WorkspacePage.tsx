@@ -5,6 +5,7 @@ import {
   api,
   type CaseResult,
   type ProblemDetail,
+  problemChatPath,
   type RunResult,
   type Submission,
   type SubmitResult,
@@ -294,7 +295,14 @@ export default function WorkspacePage() {
           ) : leftTab === "submissions" ? (
             <SubmissionsList subs={submissions} onLoad={(c) => setCode(c)} />
           ) : null}
-          <ChatPanel key={slug} sessionId={sessionId} slug={slug} code={code} hidden={leftTab !== "chat"} />
+          <ChatPanel
+            key={slug}
+            path={problemChatPath(sessionId, slug)}
+            code={code}
+            hidden={leftTab !== "chat"}
+            intro="Talk the problem through: ask for a hint, another example, edge cases, or feedback on your code. Your current code is shared with every message."
+            placeholder="Ask your colleague… (Enter to send, Shift+Enter for a new line)"
+          />
         </div>
       </section>
 

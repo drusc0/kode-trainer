@@ -1,8 +1,7 @@
 import random
-from collections.abc import Callable
 from typing import Any
 
-from .base import Problem, distinct, ints, random_bst, random_tree, word
+from .base import Problem, course_case, distinct, ints, ops_case, random_bst, random_tree, word
 
 G, M = "google", "meta"
 
@@ -120,7 +119,7 @@ class LRUCache:
 """,
         gen=lambda r: (
             [
-                _ops_case(
+                ops_case(
                     r,
                     "LRUCache",
                     [r.randint(1, 4)],
@@ -130,7 +129,7 @@ class LRUCache:
                 for _ in range(15)
             ]
             + [
-                _ops_case(
+                ops_case(
                     r,
                     "LRUCache",
                     [1000],
@@ -498,8 +497,8 @@ class Solution:
 """,
         gen=lambda r: (
             [[1, []], [3, [[1, 0], [2, 1], [0, 2]]], [3, [[0, 0]]]]
-            + [_course_case(r, r.randint(2, 20), r.random() < 0.5) for _ in range(20)]
-            + [_course_case(r, 2000, False), _course_case(r, 2000, True)]
+            + [course_case(r, r.randint(2, 20), r.random() < 0.5) for _ in range(20)]
+            + [course_case(r, 2000, False), course_case(r, 2000, True)]
         ),
     ),
     Problem(
@@ -1011,7 +1010,7 @@ class Trie:
 """,
         gen=lambda r: (
             [
-                _ops_case(
+                ops_case(
                     r,
                     "Trie",
                     [],
@@ -1021,7 +1020,7 @@ class Trie:
                 for _ in range(14)
             ]
             + [
-                _ops_case(
+                ops_case(
                     r,
                     "Trie",
                     [],
@@ -1035,17 +1034,6 @@ class Trie:
 
 
 # ---------------------------------------------------------------- private generator helpers
-def _ops_case(
-    r: random.Random, cls: str, ctor_args: list[Any], n: int, make: Callable[[], tuple[str, list[Any]]]
-) -> list[Any]:
-    ops, args = [cls], [ctor_args]
-    for _ in range(n):
-        op, a = make()
-        ops.append(op)
-        args.append(a)
-    return [{"ops": ops, "args": args}]
-
-
 def _timemap_case(r: random.Random, n: int, nkeys: int) -> list[Any]:
     keys = [word(r, 3, "abc") for _ in range(nkeys)]
     ops = ["TimeMap"]
@@ -1091,22 +1079,6 @@ def _grid(r: random.Random, R: int, C: int, alphabet: str, density: float) -> li
 
 def _int_grid(r: random.Random, R: int, C: int) -> list[list[int]]:
     return [[r.choice([0, 1, 1, 1, 2]) for _ in range(C)] for _ in range(R)]
-
-
-def _course_case(r: random.Random, n: int, cyclic: bool) -> list[Any]:
-    order = list(range(n))
-    r.shuffle(order)
-    pos = {c: i for i, c in enumerate(order)}
-    pairs: set[tuple[int, int]] = set()
-    for _ in range(min(5000, n * 2)):
-        a, b = r.sample(range(n), 2)
-        if pos[a] < pos[b]:
-            a, b = b, a
-        pairs.add((a, b))  # b before a: consistent with order, so acyclic
-    if cyclic and pairs:
-        a, b = next(iter(pairs))
-        pairs.add((b, a))
-    return [n, [list(p) for p in pairs]]
 
 
 def _ladder_case(r: random.Random, L: int, alpha: str, n: int) -> list[Any]:

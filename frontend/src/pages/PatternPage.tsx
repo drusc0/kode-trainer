@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, type ProblemSummary } from "../api";
+import { api, type ProblemSummary, patternChatPath } from "../api";
+import ChatPanel from "../components/ChatPanel";
 import Markdown from "../components/Markdown";
 import { DifficultyTag, StatusMark } from "../components/ui";
 import { PATTERNS, patternBody } from "../content/patterns";
 import { useSession } from "../session";
+
+const MENTOR_STARTERS = [
+  "Explain this like I'm new to it",
+  "Walk me through a small example step by step",
+  "Draw me a diagram of how it works",
+  "How do I tell this pattern apart from similar ones?",
+];
 
 export default function PatternPage() {
   const { slug = "" } = useParams();
@@ -45,24 +53,38 @@ export default function PatternPage() {
         <article>
           <Markdown>{patternBody(slug)}</Markdown>
         </article>
-        <aside className="practice">
-          <h3>Practise it</h3>
-          {problems === null ? (
-            <p className="muted">Loading…</p>
-          ) : problems.length === 0 ? (
-            <p className="muted">No problems yet.</p>
-          ) : (
-            <ul>
-              {problems.map((p) => (
-                <li key={p.slug}>
-                  <StatusMark status={p.status} />
-                  <Link to={`/problems/${p.slug}`}>{p.title}</Link>
-                  <DifficultyTag d={p.difficulty} />
-                </li>
-              ))}
-            </ul>
+        <aside className="pattern-side">
+          <div className="practice">
+            <h3>Practise it</h3>
+            {problems === null ? (
+              <p className="muted">Loading…</p>
+            ) : problems.length === 0 ? (
+              <p className="muted">No problems yet.</p>
+            ) : (
+              <ul>
+                {problems.map((p) => (
+                  <li key={p.slug}>
+                    <StatusMark status={p.status} />
+                    <Link to={`/problems/${p.slug}`}>{p.title}</Link>
+                    <DifficultyTag d={p.difficulty} />
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="muted small">Status shown for session “{current?.name}”.</p>
+          </div>
+          {current && (
+            <section className="mentor">
+              <h3>Ask your mentor</h3>
+              <ChatPanel
+                key={slug}
+                path={patternChatPath(current.id, slug)}
+                intro={`Stuck on something? Ask a follow-up question about ${pattern.title.toLowerCase()} and get a simple explanation, with examples and diagrams.`}
+                placeholder="Ask a follow-up question…"
+                suggestions={MENTOR_STARTERS}
+              />
+            </section>
           )}
-          <p className="muted small">Status shown for session “{current?.name}”.</p>
         </aside>
       </div>
 

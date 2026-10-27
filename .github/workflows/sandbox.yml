@@ -1,0 +1,32 @@
+name: Sandbox
+
+on:
+  pull_request:
+    paths:
+      - runner/**
+      - backend/app/catalog/**
+      - scripts/**
+      - docker-compose.yml
+  push:
+    branches: [main]
+    paths:
+      - runner/**
+      - backend/app/catalog/**
+      - scripts/**
+      - docker-compose.yml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate-catalog:
+    runs-on: ubuntu-latest
+    env:
+      RUNNER_TOKEN: ci-only
+    steps:
+      - uses: actions/checkout@v5
+      - run: make test-sandbox

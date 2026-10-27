@@ -112,6 +112,24 @@ export const PATTERNS: Pattern[] = [
     summary: "A prefix tree stores strings character by character, so prefix queries cost O(length).",
     signals: ["prefix search or autocomplete", "many lookups against one dictionary", "word games on grids"],
   },
+  {
+    slug: "math-geometry",
+    title: "Math & geometry",
+    summary:
+      "Walk a matrix with careful index rules, or turn paper arithmetic into loops: rotations, spirals, fast powers.",
+    signals: [
+      "rotate, spiral or update a matrix in place",
+      "neighbour-based cell updates",
+      "arithmetic without built-ins",
+    ],
+  },
+  {
+    slug: "bit-manipulation",
+    title: "Bit manipulation",
+    summary:
+      "Treat integers as rows of switches: XOR cancels pairs, n & (n − 1) drops the lowest bit, masks encode sets.",
+    signals: ["everything appears twice except one", "a missing number in a range", "count, reverse or add bits"],
+  },
 ];
 
 const bodies = import.meta.glob("./patterns/*.md", { query: "?raw", import: "default", eager: true }) as Record<
