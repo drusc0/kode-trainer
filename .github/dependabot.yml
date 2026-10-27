@@ -3,6 +3,10 @@ updates:
   - package-ecosystem: uv
     directory: /backend
     schedule: { interval: weekly }
+    groups:
+      backend:
+        patterns: ["*"]
+        update-types: [minor, patch]
   - package-ecosystem: npm
     directory: /frontend
     schedule: { interval: weekly }
@@ -13,6 +17,13 @@ updates:
   - package-ecosystem: docker
     directories: [/backend, /frontend, /runner]
     schedule: { interval: weekly }
+    ignore:
+      # Python upgrades go through .python-version too, so do them by hand.
+      - dependency-name: python
+        update-types: [version-update:semver-major, version-update:semver-minor]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    groups:
+      actions:
+        patterns: ["*"]
