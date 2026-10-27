@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
-from . import chat, judge
+from . import chat, judge, llm
 from .catalog import BY_SLUG, PATTERNS, PROBLEMS, Problem
 from .core import Doc, RunnerError, db, ensure_indexes, now, settings
 from .schemas import (
@@ -318,9 +318,11 @@ async def list_submissions(session_id: str, slug: str, limit: int = Query(30, ge
 
 
 # ---------------------------------------------------------------- chat
-def require_chat() -> None:
-    if not settings.anthropic_api_key:
-        raise HTTPException(503, "Chat is not configured: set ANTHROPIC_API_KEY in .env")
+def require_chat() -> llm.LLMProvider:
+    try:
+        return llm.provider()
+    except ValueError as e:
+        raise HTTPException(503, str(e)) from e
 
 
 def get_pattern(slug: str) -> str:
@@ -334,13 +336,11 @@ async def load_chat(coll: str, key: Doc) -> Doc:
     return {"messages": doc["messages"] if doc else []}
 
 
-async def chat_turn(coll: str, key: Doc, system: str, body: ChatIn) -> Doc:
+async def chat_turn(provider: llm.LLMProvider, coll: str, key: Doc, system: str, body: ChatIn) -> Doc:
     history = [ChatMessage(**m) for m in (await load_chat(coll, key))["messages"]]
     try:
-        text = await chat.reply(
-            chat.client(), settings.chat_model, system, history, chat.user_turn(body.message, body.code)
-        )
-    except chat.ChatError as e:
+        text = await chat.reply(provider, system, history, chat.user_turn(body.message, body.code))
+    except llm.ChatError as e:
         raise HTTPException(502, str(e)) from e
     answer = ChatMessage(role="assistant", content=text)
     await db()[coll].update_one(
@@ -363,11 +363,11 @@ async def get_chat(session_id: str, slug: str) -> Doc:
 
 @app.post("/api/sessions/{session_id}/problems/{slug}/chat", response_model=ChatReply)
 async def send_chat(session_id: str, slug: str, body: ChatIn) -> Doc:
-    require_chat()
+    provider = require_chat()
     await get_session(session_id)
     p = get_problem(slug)
     system = chat.build_system_prompt(p, await example_views(p))
-    return await chat_turn("chats", {"session_id": session_id, "problem": slug}, system, body)
+    return await chat_turn(provider, "chats", {"session_id": session_id, "problem": slug}, system, body)
 
 
 @app.delete("/api/sessions/{session_id}/problems/{slug}/chat", status_code=204)
@@ -384,11 +384,11 @@ async def get_pattern_chat(session_id: str, slug: str) -> Doc:
 
 @app.post("/api/sessions/{session_id}/patterns/{slug}/chat", response_model=ChatReply)
 async def send_pattern_chat(session_id: str, slug: str, body: ChatIn) -> Doc:
-    require_chat()
+    provider = require_chat()
     get_pattern(slug)
     await get_session(session_id)
     system = chat.build_pattern_prompt(slug, [p for p in PROBLEMS if p.pattern == slug])
-    return await chat_turn("pattern_chats", {"session_id": session_id, "pattern": slug}, system, body)
+    return await chat_turn(provider, "pattern_chats", {"session_id": session_id, "pattern": slug}, system, body)
 
 
 @app.delete("/api/sessions/{session_id}/patterns/{slug}/chat", status_code=204)
