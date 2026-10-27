@@ -21,6 +21,7 @@ import sys
 import time
 import traceback
 from collections import deque
+from itertools import pairwise
 from types import FrameType
 from typing import Any, NoReturn, TextIO, cast
 
@@ -138,6 +139,29 @@ class TreeNode:
         return f"TreeNode({self.val})"
 
 
+class GraphNode:
+    """Clone Graph's `Node`."""
+
+    def __init__(self, val: Any = 0, neighbors: "list[GraphNode] | None" = None) -> None:
+        self.val = val
+        self.neighbors = neighbors if neighbors is not None else []
+
+    def __repr__(self) -> str:
+        return f"Node({self.val})"
+
+
+class RandomNode:
+    """Copy List with Random Pointer's `Node`."""
+
+    def __init__(self, x: Any, next: "RandomNode | None" = None, random: "RandomNode | None" = None) -> None:
+        self.val = x
+        self.next = next
+        self.random = random
+
+    def __repr__(self) -> str:
+        return f"Node({self.val})"
+
+
 def build_list(vals: list[Any] | None) -> ListNode | None:
     head = cur = ListNode()
     for v in vals or []:
@@ -209,6 +233,80 @@ def find_node(root: TreeNode | None, val: Any) -> TreeNode | None:
     return None
 
 
+def build_graph(adj: list[list[int]]) -> GraphNode | None:
+    """LeetCode adjacency list: node i + 1 has neighbours adj[i]."""
+    nodes = [GraphNode(i + 1) for i in range(len(adj))]
+    for node, nbrs in zip(nodes, adj, strict=True):
+        node.neighbors = [nodes[j - 1] for j in nbrs]
+    return nodes[0] if nodes else None
+
+
+def graph_to_adj(node: GraphNode | None, limit: int = 200_000) -> list[list[Any]]:
+    seen: dict[int, GraphNode] = {}
+    stack = [node] if node is not None else []
+    while stack:
+        n = stack.pop()
+        if id(n) in seen:
+            continue
+        if len(seen) >= limit:
+            raise ValueError("returned graph is too large")
+        seen[id(n)] = n
+        stack.extend(n.neighbors)
+    return [[m.val for m in n.neighbors] for n in sorted(seen.values(), key=lambda n: n.val)]
+
+
+def build_random_list(pairs: list[list[Any]]) -> RandomNode | None:
+    """[[val, random_index or None], ...] -> linked nodes."""
+    nodes = [RandomNode(v) for v, _ in pairs]
+    for i, (node, (_, j)) in enumerate(zip(nodes, pairs, strict=True)):
+        node.next = nodes[i + 1] if i + 1 < len(nodes) else None
+        node.random = nodes[j] if j is not None else None
+    return nodes[0] if nodes else None
+
+
+def random_list_to_pairs(head: RandomNode | None, limit: int = 200_000) -> list[list[Any]]:
+    nodes: list[RandomNode] = []
+    while head is not None:
+        if len(nodes) >= limit:
+            raise ValueError("returned linked list is too long (cycle?)")
+        nodes.append(head)
+        head = head.next
+    index = {id(n): i for i, n in enumerate(nodes)}
+    return [[n.val, None if n.random is None else index.get(id(n.random), "outside the list")] for n in nodes]
+
+
+def index_in_list(node: Any, head: ListNode | None, limit: int = 200_000) -> Any:
+    """Position of `node` in the (possibly cyclic) list `head`; -1 for None."""
+    if node is None:
+        return -1
+    seen: set[int] = set()
+    i = 0
+    while head is not None and id(head) not in seen and i < limit:
+        if head is node:
+            return i
+        seen.add(id(head))
+        head, i = head.next, i + 1
+    return "a node that isn't in the input list"
+
+
+LINKS = ("left", "right", "next", "random", "neighbors")
+
+
+def node_ids(*roots: Any, limit: int = 200_000) -> set[int]:
+    """ids of every node reachable from the roots through tree, list or graph links."""
+    seen: set[int] = set()
+    stack = list(roots)
+    while stack and len(seen) < limit:
+        n = stack.pop()
+        if n is None or id(n) in seen or not any(hasattr(n, a) for a in LINKS):
+            continue
+        seen.add(id(n))
+        for a in LINKS:
+            link = getattr(n, a, None)
+            stack.extend(link if isinstance(link, list) else [link])
+    return seen
+
+
 def base_type(t: str) -> str:
     t = t.replace(" ", "")
     if t.startswith("Optional[") and t.endswith("]"):
@@ -230,14 +328,31 @@ def convert_args(raw_args: list[Any], param_types: list[str]) -> list[Any]:
         elif bt.startswith("TreeNode@"):  # a reference to a node inside another tree argument
             ref_index = int(bt.split("@")[1])
             out.append(find_node(out[ref_index], raw))
+        elif bt.startswith("CyclePos@"):  # links that list's tail to node `raw`; not passed to the solution
+            nodes, cur = [], out[int(bt.split("@")[1])]
+            while cur is not None:
+                nodes.append(cur)
+                cur = cur.next
+            if raw >= 0:
+                nodes[-1].next = nodes[raw]
+        elif bt == "GraphNode":
+            out.append(build_graph(raw))
+        elif bt == "RandomList":
+            out.append(build_random_list(raw))
         else:
             out.append(raw)
     return out
 
 
-def normalize(value: Any, return_type: str | None) -> Any:
+def normalize(value: Any, return_type: str | None, args: list[Any]) -> Any:
     """Python return value -> JSON-able value."""
     bt = base_type(return_type or "")
+    if bt.startswith("ListNode@"):
+        return index_in_list(value, args[int(bt.split("@")[1])])
+    if bt == "GraphNode":
+        return graph_to_adj(value)
+    if bt == "RandomList":
+        return random_list_to_pairs(value)
     if bt == "ListNode":
         return list_to_array(value) if value is not None else []
     if bt == "TreeNode":
@@ -360,6 +475,18 @@ def check(mode: str, out: Any, exp: Any, args: Any) -> bool:
         if mode == "min_remove_parens":
             s = args[0]
             return isinstance(out, str) and len(out) == len(exp) and is_valid_parens(out) and is_subsequence(out, s)
+        if mode == "alien_order":
+            words = args[0]
+            if exp == "":
+                return isinstance(out, str) and not out
+            if not isinstance(out, str) or len(set(out)) != len(out) or set(out) != set("".join(words)):
+                return False
+            rank = {c: i for i, c in enumerate(out)}
+            for a, b in pairwise(words):
+                diff = next(((x, y) for x, y in zip(a, b, strict=False) if x != y), None)
+                if diff and rank[diff[0]] > rank[diff[1]]:
+                    return False
+            return True
         if mode == "topo_order":
             n, prereqs = args
             if exp == []:
@@ -450,7 +577,9 @@ def main() -> None:
     mode = job.get("compare", "exact")
     tl = max(0.05, job.get("time_limit_ms", 2000) / 1000)
 
-    ns: dict[str, Any] = {"__name__": "__main__", "ListNode": ListNode, "TreeNode": TreeNode}
+    codec = job.get("codec")
+    node_cls = RandomNode if "RandomList" in param_types else GraphNode
+    ns: dict[str, Any] = {"__name__": "__main__", "ListNode": ListNode, "TreeNode": TreeNode, "Node": node_cls}
     exec(compile(PRELUDE, "<prelude>", "exec"), ns)
 
     # compile + load
@@ -485,7 +614,7 @@ def main() -> None:
     finally:
         sys.stdout, sys.stderr = real_stdout, real_stderr
 
-    if kind == "design":
+    if kind == "design" or codec:
         target: Any = ns.get(entry)
         if not isinstance(target, type):
             emit(
@@ -522,12 +651,23 @@ def main() -> None:
                 value: Any = [None]
                 for op, a in zip(ops[1:], op_args[1:], strict=False):
                     value.append(getattr(obj, op)(*a))
+                args = []
+            elif codec:  # encode with one instance, decode with a fresh one
+                args = convert_args(raw, param_types)
+                data = getattr(target(), codec[0])(*args)
+                if not isinstance(data, str):
+                    raise TypeError(f"{codec[0]} must return a str, not {type(data).__name__}")
+                value = getattr(target(), codec[1])(data)
             else:
                 args = convert_args(raw, param_types)
                 value = getattr(sol_cls(), entry)(*args)
             signal.setitimer(signal.ITIMER_REAL, 0)
             result["ms"] = round((time.perf_counter() - t0) * 1000, 3)
-            out = normalize(value, return_type)
+            needs_copy = codec or base_type(return_type) in ("GraphNode", "RandomList")
+            if needs_copy and node_ids(value) & node_ids(*args):
+                out = "returned original input nodes instead of building new ones"
+            else:
+                out = normalize(value, return_type, args)
             text = json.dumps(out)
             if len(text) > MAX_OUTPUT_REPR:
                 out = text[:MAX_OUTPUT_REPR] + "…"

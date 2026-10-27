@@ -1165,6 +1165,85 @@ class Solution:
         compare="sorted",
         time_limit_ms=4000,
     ),
+    Problem(
+        slug="clone-graph",
+        title="Clone Graph",
+        difficulty="Medium",
+        pattern="graphs",
+        topics=["Hash Table", "DFS", "BFS", "Graph"],
+        companies=[M, G],
+        statement="Return a **deep copy** of a connected undirected graph, given one of its nodes. Each `Node` has a `val` and a list of `neighbors`. The copy must be made of new nodes only.\n\nGraphs are shown as adjacency lists: node `i + 1` has the neighbours listed at index `i`, and you're given node 1 (or `None` for an empty graph).",
+        entry="cloneGraph",
+        params=[("node", "GraphNode")],
+        returns="GraphNode",
+        examples=[{"args": [[[2, 4], [1, 3], [2, 4], [1, 3]]]}, {"args": [[[]]]}, {"args": [[]]}],
+        constraints=["0 ≤ nodes ≤ 100", "Node.val is unique, from 1 to n", "No repeated edges or self-loops"],
+        hints=[
+            "DFS or BFS with a dict original → copy. Create a node's copy the first time you see it, so cycles don't loop forever.",
+        ],
+        reference="""
+class Solution:
+    def cloneGraph(self, node):
+        if not node: return None
+        copy = {node: Node(node.val)}; st = [node]
+        while st:
+            n = st.pop()
+            for m in n.neighbors:
+                if m not in copy:
+                    copy[m] = Node(m.val); st.append(m)
+                copy[n].neighbors.append(copy[m])
+        return copy[node]
+""",
+        gen=lambda r: [[_connected_graph(r, r.randint(2, 12))] for _ in range(19)] + [[_connected_graph(r, 100)]],
+    ),
+    Problem(
+        slug="alien-dictionary",
+        title="Alien Dictionary",
+        difficulty="Hard",
+        pattern="graphs",
+        topics=["Array", "String", "Graph", "Topological Sort"],
+        companies=[M, G],
+        statement='An alien language uses lowercase English letters in an unknown order. `words` is sorted lexicographically by that order. Return a string of all the letters that appear in `words`, in an order consistent with it. If several orders work, return any of them; if none does, return `""`.\n\nAs usual, a word comes before any longer word it is a prefix of, so `["abc", "ab"]` is invalid.',
+        entry="alienOrder",
+        params=[("words", "List[str]")],
+        returns="str",
+        examples=[
+            {"args": [["wrt", "wrf", "er", "ett", "rftt"]], "note": '"wertf"'},
+            {"args": [["z", "x"]]},
+            {"args": [["z", "x", "z"]], "note": "z < x < z is impossible."},
+        ],
+        constraints=["1 ≤ len(words) ≤ 100", "1 ≤ len(words[i]) ≤ 100"],
+        hints=[
+            "Only adjacent words tell you anything: their first differing letters give one edge a → b.",
+            'Topologically sort the letters (Kahn\'s algorithm). A cycle, or a word followed by its own prefix, means "".',
+        ],
+        reference="""
+class Solution:
+    def alienOrder(self, words):
+        letters = sorted(set(''.join(words)))
+        adj = {c: set() for c in letters}; indeg = dict.fromkeys(letters, 0)
+        for a, b in zip(words, words[1:]):
+            for x, y in zip(a, b):
+                if x != y:
+                    if y not in adj[x]: adj[x].add(y); indeg[y] += 1
+                    break
+            else:
+                if len(a) > len(b): return ''
+        q = deque(c for c in letters if indeg[c] == 0); out = []
+        while q:
+            c = q.popleft(); out.append(c)
+            for d in sorted(adj[c]):
+                indeg[d] -= 1
+                if indeg[d] == 0: q.append(d)
+        return ''.join(out) if len(out) == len(letters) else ''
+""",
+        gen=lambda r: (
+            [[["a"]], [["ab", "adc"]], [["abc", "ab"]], [["ac", "ab", "zc", "zb"]]]
+            + [[_alien_words(r, r.randint(2, 12), r.randint(2, 6))] for _ in range(18)]
+            + [[_alien_words(r, 100, 26)]]
+        ),
+        compare="alien_order",
+    ),
 ]
 
 
@@ -1312,3 +1391,29 @@ def _sudoku_variant(r: random.Random, puzzle: str) -> list[list[str]]:
     cols = [b * 3 + i for b in r.sample(range(3), 3) for i in r.sample(range(3), 3)]
     grid = [[grid[i][j] for j in cols] for i in rows]
     return [list(row) for row in zip(*grid, strict=True)] if r.random() < 0.5 else grid
+
+
+def _connected_graph(r: random.Random, n: int) -> list[list[int]]:
+    adj: list[set[int]] = [set() for _ in range(n + 1)]
+    for v in range(2, n + 1):  # a random spanning tree keeps it connected
+        u = r.randint(1, v - 1)
+        adj[u].add(v)
+        adj[v].add(u)
+    for _ in range(r.randint(0, n)):
+        u, v = r.sample(range(1, n + 1), 2)
+        adj[u].add(v)
+        adj[v].add(u)
+    return [sorted(s) for s in adj[1:]]
+
+
+def _alien_words(r: random.Random, n: int, k: int) -> list[str]:
+    order = r.sample("abcdefghijklmnopqrstuvwxyz", k)
+    rank = {c: i for i, c in enumerate(order)}
+    words = sorted({word(r, r.randint(1, 5), "".join(order)) for _ in range(n)}, key=lambda w: [rank[c] for c in w])
+    if len(words) > 1 and r.random() < 0.3:  # break it: swap two neighbours or put a word after its extension
+        i = r.randrange(len(words) - 1)
+        words[i], words[i + 1] = words[i + 1], words[i]
+    elif r.random() < 0.1:
+        words.append(words[-1][:-1] or words[-1])
+        words[-2] += order[0]
+    return words

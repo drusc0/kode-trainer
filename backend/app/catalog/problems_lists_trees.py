@@ -1274,6 +1274,150 @@ class Solution:
             + [[random_tree(r, ints(r, 30_000, -1000, 1000))]]
         ),
     ),
+    Problem(
+        slug="linked-list-cycle",
+        title="Linked List Cycle",
+        difficulty="Easy",
+        pattern="linked-list",
+        topics=["Hash Table", "Linked List", "Two Pointers"],
+        companies=[G, M],
+        statement=f"Return `True` if the linked list has a cycle: following `next` pointers eventually revisits a node. {LIST_NOTE}\n\nIn tests, `pos` is the index of the node the tail links back to (`-1` for no cycle). It only builds the input; it is **not** passed to your function.\n\nBonus: O(1) extra space.",
+        entry="hasCycle",
+        params=[("head", "Optional[ListNode]"), ("pos", "CyclePos@0")],
+        returns="bool",
+        examples=[{"args": [[3, 2, 0, -4], 1]}, {"args": [[1, 2], 0]}, {"args": [[1], -1]}],
+        constraints=["0 ≤ nodes ≤ 10⁴", "pos is −1 or a valid index"],
+        hints=[
+            "Floyd's tortoise and hare: a slow pointer (1 step) and a fast one (2 steps) meet if and only if there's a cycle."
+        ],
+        reference="""
+class Solution:
+    def hasCycle(self, head):
+        slow = fast = head
+        while fast and fast.next:
+            slow, fast = slow.next, fast.next.next
+            if slow is fast: return True
+        return False
+""",
+        gen=lambda r: [[[], -1]] + [_cycle_case(r, r.randint(1, 20)) for _ in range(19)] + [_cycle_case(r, 10_000)],
+    ),
+    Problem(
+        slug="linked-list-cycle-ii",
+        title="Linked List Cycle II",
+        difficulty="Medium",
+        pattern="linked-list",
+        topics=["Hash Table", "Linked List", "Two Pointers"],
+        companies=[G, M],
+        statement=f"Return the node where the cycle begins, or `None` if there's no cycle. Don't modify the list. {LIST_NOTE}\n\nIn tests, `pos` is the index the tail links back to (`-1` for none) and is not passed to your function. The output shows the **index** of the node you return (`-1` for `None`).\n\nBonus: O(1) extra space.",
+        entry="detectCycle",
+        params=[("head", "Optional[ListNode]"), ("pos", "CyclePos@0")],
+        returns="ListNode@0",
+        examples=[{"args": [[3, 2, 0, -4], 1]}, {"args": [[1, 2], 0]}, {"args": [[1], -1]}],
+        constraints=["0 ≤ nodes ≤ 10⁴", "pos is −1 or a valid index"],
+        hints=[
+            "Find the meeting point with fast/slow pointers first.",
+            "Then move one pointer back to head and step both one at a time: they meet at the cycle's start. (The distances work out — try drawing it.)",
+        ],
+        reference="""
+class Solution:
+    def detectCycle(self, head):
+        seen = set()
+        while head and head not in seen:
+            seen.add(head); head = head.next
+        return head
+""",
+        gen=lambda r: [[[], -1]] + [_cycle_case(r, r.randint(1, 20)) for _ in range(19)] + [_cycle_case(r, 10_000)],
+    ),
+    Problem(
+        slug="copy-list-with-random-pointer",
+        title="Copy List with Random Pointer",
+        difficulty="Medium",
+        pattern="linked-list",
+        topics=["Hash Table", "Linked List"],
+        companies=[M, G],
+        statement="Each node has a `next` pointer and a `random` pointer that points to any node in the list or to `None`. Return a **deep copy**: brand-new nodes whose `next` and `random` pointers mirror the original. No pointer in the copy may point into the original list.\n\nLists are shown as `[[val, random_index], ...]`, with `None` when `random` is empty.",
+        entry="copyRandomList",
+        params=[("head", "RandomList")],
+        returns="RandomList",
+        examples=[
+            {"args": [[[7, None], [13, 0], [11, 4], [10, 2], [1, 0]]]},
+            {"args": [[[1, 1], [2, 1]]]},
+            {"args": [[]]},
+        ],
+        constraints=["0 ≤ nodes ≤ 1000", "−10⁴ ≤ Node.val ≤ 10⁴"],
+        hints=[
+            "A dict original → copy: create every copy in one pass, then wire next and random in a second pass.",
+            "O(1) space: weave each copy right after its original, set randoms, then unweave.",
+        ],
+        reference="""
+class Solution:
+    def copyRandomList(self, head):
+        copy = {}
+        cur = head
+        while cur:
+            copy[cur] = Node(cur.val); cur = cur.next
+        for old, new in copy.items():
+            new.next = copy.get(old.next); new.random = copy.get(old.random)
+        return copy.get(head)
+""",
+        gen=lambda r: [_random_list(r, r.randint(1, 15)) for _ in range(19)] + [_random_list(r, 1000)],
+    ),
+    Problem(
+        slug="serialize-and-deserialize-binary-tree",
+        title="Serialize and Deserialize Binary Tree",
+        difficulty="Hard",
+        pattern="trees",
+        topics=["String", "Tree", "DFS", "BFS", "Design"],
+        companies=[G, M],
+        statement=f"Design `Codec` to turn a binary tree into a string (`serialize`) and back (`deserialize`). Any format works as long as the round trip rebuilds the same tree. {TREE_NOTE}\n\nTests check that `deserialize(serialize(root))` matches `root`. Each method runs on its **own** `Codec` instance, and the rebuilt tree must be made of new nodes.",
+        entry="Codec",
+        codec=("serialize", "deserialize"),
+        params=[("root", "Optional[TreeNode]")],
+        returns="Optional[TreeNode]",
+        starter="""
+# Definition for a binary tree node.
+# class TreeNode:
+#     def __init__(self, val=0, left=None, right=None):
+#         self.val = val
+#         self.left = left
+#         self.right = right
+class Codec:
+
+    def serialize(self, root: Optional[TreeNode]) -> str:
+        
+
+    def deserialize(self, data: str) -> Optional[TreeNode]:
+        
+""",
+        examples=[{"args": [[1, 2, 3, None, None, 4, 5]]}, {"args": [[]]}, {"args": [[-1000, None, 1000]]}],
+        constraints=["0 ≤ nodes ≤ 10⁴", "−1000 ≤ Node.val ≤ 1000"],
+        hints=[
+            "Preorder with a marker for empty children (`1,2,#,#,3,…`) is enough to rebuild the tree: read tokens in the same order.",
+            "Or reuse the level-order format: BFS out, BFS back in.",
+        ],
+        reference="""
+class Codec:
+    def serialize(self, root):
+        out, st = [], [root]
+        while st:
+            n = st.pop()
+            if n is None: out.append('#'); continue
+            out.append(str(n.val)); st += [n.right, n.left]
+        return ','.join(out)
+    def deserialize(self, data):
+        it = iter(data.split(','))
+        def build():
+            v = next(it)
+            if v == '#': return None
+            n = TreeNode(int(v)); n.left = build(); n.right = build()
+            return n
+        return build()
+""",
+        gen=lambda r: (
+            [[random_tree(r, ints(r, r.randint(1, 40), -1000, 1000))] for _ in range(19)]
+            + [[random_tree(r, ints(r, 10_000, -1000, 1000))]]
+        ),
+    ),
 ]
 
 
@@ -1394,3 +1538,11 @@ def _traversals(r: random.Random, n: int) -> list[Any]:
         ino.append(cur["v"])
         cur = cur["r"]
     return [pre, ino]
+
+
+def _cycle_case(r: random.Random, n: int) -> list[Any]:
+    return [ints(r, n, -(10**5), 10**5), r.randint(0, n - 1) if r.random() < 0.6 else -1]
+
+
+def _random_list(r: random.Random, n: int) -> list[Any]:
+    return [[[r.randint(-(10**4), 10**4), r.randrange(n) if r.random() < 0.7 else None] for _ in range(n)]]
